@@ -264,16 +264,6 @@ const routes = [
       hideInSidebar: true
     },
     component: () => import('../views/StructureView.vue')
-  },
-  {
-    path: '/test/participant/register',
-    name: 'participant-register',
-    meta: {
-      title: 'Регистрация участника',
-      hideInSidebar: true,
-      public: true
-    },
-    component: () => import('../views/test/ParticipantRegisterView.vue')
   }
 ]
 
@@ -283,7 +273,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const publicPages = ['/login', '/test/participant/register'];
+  const publicPages = ['/login'];
   const authRequired = !publicPages.includes(to.path) && !to.meta?.public;
   const token = localStorage.getItem('access_token');
 
