@@ -1,0 +1,700 @@
+<template>
+  <div class="d-flex flex-column h-100">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
+      <div class="position-relative" style="flex: 1; max-width: 400px;">
+        <i class="bi bi-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d; z-index: 10;"></i>
+        <input 
+          type="text" 
+          v-model="searchQuery"
+          class="form-control ps-5"
+          placeholder="Поиск..."
+          style="font-size: 14px;"
+          @input="handleSearchInput"
+        />
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <!-- Filters Dropdown -->
+        <div class="dropdown">
+          <button 
+            class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2" 
+            type="button" 
+            data-bs-toggle="dropdown" 
+            aria-expanded="false"
+            style="font-size: 14px;"
+          >
+            <i class="bi bi-funnel"></i>
+            Фильтры
+            <span v-if="hasActiveFilters" class="badge bg-primary rounded-pill" style="font-size: 0.7rem;">
+              {{ activeFiltersCount }}
+            </span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end p-3" style="min-width: 350px; max-width: 500px;">
+            <li class="mb-3">
+              <label class="form-label small mb-2 fw-semibold">Филиалы</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="branch in branches" 
+                  :key="branch.id"
+                  class="badge"
+                  :class="selectedBranchIds.includes(branch.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="toggleBranch(branch.id)"
+                >
+                  {{ branch.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2 fw-semibold">Пакеты</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="paket in pakets" 
+                  :key="paket.id"
+                  class="badge"
+                  :class="selectedPaketIds.includes(paket.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="togglePaket(paket.id)"
+                >
+                  {{ paket.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2 fw-semibold">Статусы</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="status in statuses" 
+                  :key="status.id"
+                  class="badge"
+                  :class="selectedStatusIds.includes(status.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="toggleStatus(status.id)"
+                >
+                  {{ status.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2 fw-semibold">Сортировка по дате создания</label>
+              <select class="form-select form-select-sm" v-model="sortByCreatedAt" @change="applyFilters">
+                <option :value="null">Без сортировки</option>
+                <option value="asc">По возрастанию</option>
+                <option value="desc">По убыванию</option>
+              </select>
+            </li>
+            <li>
+              <button 
+                v-if="hasActiveFilters" 
+                class="btn btn-sm btn-outline-danger w-100" 
+                @click="clearFilters"
+              >
+                Сбросить фильтры
+              </button>
+            </li>
+          </ul>
+        </div>
+        
+        <button 
+          class="btn btn-primary d-flex align-items-center gap-2"
+          style="font-size: 14px; background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128);"
+          @click="openAddModal"
+        >
+          <i class="bi bi-plus-circle"></i>
+          Добавить участника
+        </button>
+        
+        <span class="text-muted small">Показать:</span>
+        <select 
+          v-model="pageSize" 
+          @change="changePageSize"
+          class="form-select form-select-sm page-size-select"
+        >
+          <option :value="20">20</option>
+          <option :value="30">30</option>
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div v-if="error" class="alert alert-danger flex-shrink-0" role="alert">
+      {{ error }}
+    </div>
+
+    <div v-if="loading" class="text-center py-5 flex-grow-1 d-flex align-items-center justify-content-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+      </div>
+    </div>
+
+    <div v-else class="d-flex flex-column flex-grow-1 overflow-hidden">
+      <div class="flex-grow-1 overflow-auto">
+        <DataTable
+          :columns="columns"
+          :items="participants"
+          :actions="actions"
+          class="h-100"
+        >
+          <template #cell-fullname="{ item }">
+            <span 
+              class="text-primary" 
+              style="cursor: pointer; text-decoration: underline;"
+              @click="openViewParticipantModal(item)"
+            >
+              {{ formatFullName(item) }}
+            </span>
+          </template>
+          <template #cell-personal_number="{ item }">
+            <span 
+              class="text-primary" 
+              style="cursor: pointer; text-decoration: underline;"
+              @click="openCabinetDetailsModal(item.id)"
+            >
+              {{ item.personal_number }}
+            </span>
+          </template>
+          <template #cell-created_at="{ value }">
+            {{ formatDate(value) }}
+          </template>
+        </DataTable>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex-shrink-0 mt-3 d-flex justify-content-center">
+        <nav v-if="totalPages > 1" aria-label="Page navigation">
+          <ul class="pagination mb-0">
+            <li 
+              v-for="page in displayedPages" 
+              :key="page" 
+              class="page-item"
+              :class="{ active: currentPage === page, disabled: page === '...' }"
+            >
+              <button class="page-link" @click="page !== '...' && changePage(page)">
+                {{ page }}
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Модальное окно добавления участника -->
+    <AddParticipantModal
+      :is-open="addModalOpen"
+      :branches="branches"
+      :pakets="pakets"
+      :statuses="statuses"
+      :preselected-participant="preselectedParticipant"
+      @close="closeAddModal"
+      @success="handleAddSuccess"
+      @error="handleAddError"
+    />
+
+    <!-- Модальное окно добавления в структуру -->
+    <AddToStructureModal
+      :is-open="addToStructureModalOpen"
+      :cabinet-id="selectedCabinetIdForStructure"
+      @close="closeAddToStructureModal"
+      @success="handleAddToStructureSuccess"
+      @error="handleAddToStructureError"
+    />
+
+    <!-- Модальное окно просмотра участника -->
+    <ViewParticipantModal
+      :is-open="viewParticipantModalOpen"
+      :participant-id="selectedParticipantId"
+      @close="closeViewParticipantModal"
+      @openAddCabinet="handleOpenAddCabinet"
+    />
+
+    <!-- Модальное окно информации о кабинете -->
+    <CabinetDetailsModal
+      :is-open="cabinetDetailsModalOpen"
+      :cabinet-id="selectedCabinetId"
+      @close="closeCabinetDetailsModal"
+    />
+
+    <!-- Модальное окно личников -->
+    <PersonalCabinetsModal
+      :is-open="personalCabinetsModalOpen"
+      :sponsor-id="selectedSponsorId"
+      @close="closePersonalCabinetsModal"
+    />
+
+    <!-- Модальное окно редактирования -->
+    <EditParticipantModal
+      :is-open="editModalOpen"
+      :cabinet-id="selectedCabinetIdForEdit"
+      :participant-id="selectedParticipantIdForEdit"
+      :branches="branches"
+      :pakets="pakets"
+      @close="closeEditModal"
+      @success="handleEditSuccess"
+    />
+
+    <!-- Модальное окно бонусов -->
+    <BonusesModal
+      :is-open="bonusesModalOpen"
+      :cabinet-id="selectedCabinetIdForBonuses"
+      :participant-id="selectedParticipantIdForBonuses"
+      @close="closeBonusesModal"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue'
+import DataTable from '../components/DataTable.vue'
+import AddParticipantModal from '../components/AddParticipantModal.vue'
+import AddToStructureModal from '../components/AddToStructureModal.vue'
+import ViewParticipantModal from '../components/ViewParticipantModal.vue'
+import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
+import PersonalCabinetsModal from '../components/PersonalCabinetsModal.vue'
+import EditParticipantModal from '../components/EditParticipantModal.vue'
+import BonusesModal from '../components/BonusesModal.vue'
+import { BACKEND_API_URL } from '../config'
+
+const participants = ref([])
+const allParticipants = ref([])
+const loading = ref(false)
+const error = ref('')
+const currentPage = ref(Number(localStorage.getItem('registrations_page')) || 1)
+const totalPages = ref(1)
+const pageSize = ref(Number(localStorage.getItem('registrations_pageSize')) || 20)
+const searchQuery = ref('')
+
+const branches = ref([])
+const pakets = ref([])
+const statuses = ref([])
+
+const selectedBranchIds = ref([])
+const selectedPaketIds = ref([])
+const selectedStatusIds = ref([])
+const sortByCreatedAt = ref(null)
+
+const addModalOpen = ref(false)
+const addToStructureModalOpen = ref(false)
+const selectedCabinetIdForStructure = ref(null)
+const viewParticipantModalOpen = ref(false)
+const selectedParticipantId = ref(null)
+const preselectedParticipant = ref(null)
+
+// Cabinet details modal
+const cabinetDetailsModalOpen = ref(false)
+const selectedCabinetId = ref(null)
+
+// Personal cabinets modal
+const personalCabinetsModalOpen = ref(false)
+const selectedSponsorId = ref(null)
+
+// Edit modal
+const editModalOpen = ref(false)
+const selectedCabinetIdForEdit = ref(null)
+const selectedParticipantIdForEdit = ref(null)
+
+// Bonuses modal
+const bonusesModalOpen = ref(false)
+const selectedCabinetIdForBonuses = ref(null)
+const selectedParticipantIdForBonuses = ref(null)
+
+const columns = [
+  { key: 'branch_name', label: 'Филиал' },
+  { key: 'personal_number', label: 'Номер' },
+  { key: 'fullname', label: 'ФИО' },
+  { key: 'paket_name', label: 'Пакет' },
+  { key: 'status_name', label: 'Статус' },
+  { key: 'sequence_number', label: 'Номер кабинета' },
+  { key: 'created_at', label: 'Дата создания' }
+]
+
+const actions = [
+  {
+    label: 'Добавить в структуру',
+    icon: 'bi-plus-circle',
+    handler: (item) => openAddToStructureModal(item)
+  },
+  {
+    label: 'Личники',
+    icon: 'bi-people',
+    handler: (item) => openPersonalCabinetsModal(item.id)
+  },
+  {
+    label: 'Бонусы',
+    icon: 'bi-cash-coin',
+    handler: (item) => openBonusesModal(item)
+  },
+  {
+    label: 'Изменить',
+    icon: 'bi-pencil',
+    handler: (item) => console.log('Edit', item)
+  },
+  {
+    label: 'Удалить',
+    icon: 'bi-trash',
+    class: 'text-danger',
+    handler: (item) => console.log('Delete', item)
+  }
+]
+
+const formatFullName = (item) => {
+  if (!item.participant) return '-'
+  return `${item.participant.lastname || ''} ${item.participant.name || ''} ${item.participant.patronymic || ''}`.trim()
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}.${month}.${day} ${hours}:${minutes}`
+}
+
+const fetchBranches = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/branches/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (response.ok) {
+      branches.value = await response.json()
+    }
+  } catch (e) {
+    console.error('Error fetching branches:', e)
+  }
+}
+
+const fetchPakets = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/pakets/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (response.ok) {
+      pakets.value = await response.json()
+    }
+  } catch (e) {
+    console.error('Error fetching pakets:', e)
+  }
+}
+
+const fetchStatuses = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/statuses/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (response.ok) {
+      statuses.value = await response.json()
+    }
+  } catch (e) {
+    console.error('Error fetching statuses:', e)
+  }
+}
+
+const fetchParticipants = async (page = 1) => {
+  loading.value = true
+  error.value = ''
+  try {
+    const token = localStorage.getItem('access_token')
+    
+    // Строим URL с параметрами
+    const params = new URLSearchParams({
+      registered: 'false',
+      page: page.toString(),
+      page_size: pageSize.value.toString()
+    })
+    
+    // Добавляем поиск если есть
+    if (searchQuery.value.trim()) {
+      params.append('search', searchQuery.value.trim())
+    }
+    
+    // Добавляем множественные фильтры по филиалам
+    selectedBranchIds.value.forEach(id => {
+      params.append('branch_id', id.toString())
+    })
+    
+    // Добавляем множественные фильтры по пакетам
+    selectedPaketIds.value.forEach(id => {
+      params.append('paket_id', id.toString())
+    })
+    
+    // Добавляем множественные фильтры по статусам
+    selectedStatusIds.value.forEach(id => {
+      params.append('status_id', id.toString())
+    })
+    
+    // Добавляем сортировку
+    if (sortByCreatedAt.value) {
+      params.append('sort_by_created_at', sortByCreatedAt.value)
+    }
+    
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch participants')
+    }
+
+    const data = await response.json()
+    allParticipants.value = data.cabinets.map(c => ({
+      ...c,
+      branch_name: c.branch?.name || '-',
+      branch_id: c.branch_id || null,
+      paket_name: c.paket?.name || '-',
+      status_name: c.status?.name || '-',
+      fullname: c.participant ? `${c.participant.lastname || ''} ${c.participant.name || ''} ${c.participant.patronymic || ''}`.trim() : '-'
+    }))
+    
+    totalPages.value = data.total_pages
+    currentPage.value = data.page
+    participants.value = allParticipants.value
+    localStorage.setItem('registrations_page', data.page.toString())
+  } catch (e) {
+    console.error('Error fetching participants:', e)
+    error.value = 'Ошибка при загрузке данных'
+  } finally {
+    loading.value = false
+  }
+}
+
+const changePage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+    localStorage.setItem('registrations_page', page.toString())
+    fetchParticipants(page)
+  }
+}
+
+const changePageSize = () => {
+  currentPage.value = 1
+  localStorage.setItem('registrations_pageSize', pageSize.value.toString())
+  localStorage.setItem('registrations_page', '1')
+  fetchParticipants(1)
+}
+
+const displayedPages = computed(() => {
+  const delta = 2
+  const range = []
+  const rangeWithDots = []
+  let l
+
+  for (let i = 1; i <= totalPages.value; i++) {
+    if (i === 1 || i === totalPages.value || (i >= currentPage.value - delta && i <= currentPage.value + delta)) {
+      range.push(i)
+    }
+  }
+
+  range.forEach(i => {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1)
+      } else if (i - l !== 1) {
+        rangeWithDots.push('...')
+      }
+    }
+    rangeWithDots.push(i)
+    l = i
+  })
+
+  return rangeWithDots
+})
+
+const toggleBranch = (branchId) => {
+  const index = selectedBranchIds.value.indexOf(branchId)
+  if (index > -1) {
+    selectedBranchIds.value.splice(index, 1)
+  } else {
+    selectedBranchIds.value.push(branchId)
+  }
+  applyFilters()
+}
+
+const togglePaket = (paketId) => {
+  const index = selectedPaketIds.value.indexOf(paketId)
+  if (index > -1) {
+    selectedPaketIds.value.splice(index, 1)
+  } else {
+    selectedPaketIds.value.push(paketId)
+  }
+  applyFilters()
+}
+
+const toggleStatus = (statusId) => {
+  const index = selectedStatusIds.value.indexOf(statusId)
+  if (index > -1) {
+    selectedStatusIds.value.splice(index, 1)
+  } else {
+    selectedStatusIds.value.push(statusId)
+  }
+  applyFilters()
+}
+
+const hasActiveFilters = computed(() => {
+  return selectedBranchIds.value.length > 0 || 
+         selectedPaketIds.value.length > 0 || 
+         selectedStatusIds.value.length > 0 ||
+         sortByCreatedAt.value !== null
+})
+
+const activeFiltersCount = computed(() => {
+  let count = 0
+  if (selectedBranchIds.value.length > 0) count++
+  if (selectedPaketIds.value.length > 0) count++
+  if (selectedStatusIds.value.length > 0) count++
+  if (sortByCreatedAt.value !== null) count++
+  return count
+})
+
+const clearFilters = () => {
+  selectedBranchIds.value = []
+  selectedPaketIds.value = []
+  selectedStatusIds.value = []
+  sortByCreatedAt.value = null
+  fetchParticipants(1)
+}
+
+const applyFilters = () => {
+  currentPage.value = 1
+  fetchParticipants(1)
+}
+
+const handleSearchInput = () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    fetchParticipants(1)
+  }, 500)
+}
+
+let searchTimeout = null
+
+// Watch for page size changes
+watch(pageSize, (newSize) => {
+  localStorage.setItem('registrations_pageSize', newSize.toString())
+})
+
+const openAddModal = () => {
+  addModalOpen.value = true
+}
+
+const closeAddModal = () => {
+  addModalOpen.value = false
+  preselectedParticipant.value = null
+}
+
+const handleAddSuccess = async () => {
+  await fetchParticipants(1)
+}
+
+const handleAddError = (errorMessage) => {
+  error.value = errorMessage
+}
+
+const openAddToStructureModal = (item) => {
+  selectedCabinetIdForStructure.value = item.id
+  addToStructureModalOpen.value = true
+}
+
+const closeAddToStructureModal = () => {
+  addToStructureModalOpen.value = false
+  selectedCabinetIdForStructure.value = null
+}
+
+const handleAddToStructureSuccess = async () => {
+  await fetchParticipants(currentPage.value)
+}
+
+const handleAddToStructureError = (errorMessage) => {
+  error.value = errorMessage
+}
+
+const openViewParticipantModal = (item) => {
+  selectedParticipantId.value = item.participant_id
+  viewParticipantModalOpen.value = true
+}
+
+const closeViewParticipantModal = () => {
+  viewParticipantModalOpen.value = false
+  selectedParticipantId.value = null
+}
+
+const openCabinetDetailsModal = (cabinetId) => {
+  selectedCabinetId.value = cabinetId
+  cabinetDetailsModalOpen.value = true
+}
+
+const closeCabinetDetailsModal = () => {
+  cabinetDetailsModalOpen.value = false
+  selectedCabinetId.value = null
+}
+
+const openPersonalCabinetsModal = (sponsorId) => {
+  selectedSponsorId.value = sponsorId
+  personalCabinetsModalOpen.value = true
+}
+
+const closePersonalCabinetsModal = () => {
+  personalCabinetsModalOpen.value = false
+  selectedSponsorId.value = null
+}
+
+const openEditModal = (item) => {
+  selectedCabinetIdForEdit.value = item.id
+  selectedParticipantIdForEdit.value = item.participant_id
+  editModalOpen.value = true
+}
+
+const closeEditModal = () => {
+  editModalOpen.value = false
+  selectedCabinetIdForEdit.value = null
+  selectedParticipantIdForEdit.value = null
+}
+
+const handleEditSuccess = () => {
+  fetchParticipants(currentPage.value)
+}
+
+const openBonusesModal = (item) => {
+  selectedCabinetIdForBonuses.value = item.id
+  selectedParticipantIdForBonuses.value = item.participant_id
+  bonusesModalOpen.value = true
+}
+
+const closeBonusesModal = () => {
+  bonusesModalOpen.value = false
+  selectedCabinetIdForBonuses.value = null
+  selectedParticipantIdForBonuses.value = null
+}
+
+const handleOpenAddCabinet = (participant) => {
+  preselectedParticipant.value = participant
+  viewParticipantModalOpen.value = false
+  addModalOpen.value = true
+}
+
+onMounted(async () => {
+  await Promise.all([
+    fetchBranches(),
+    fetchPakets(),
+    fetchStatuses()
+  ])
+  fetchParticipants(currentPage.value)
+})
+</script>
