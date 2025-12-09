@@ -26,7 +26,23 @@
             Фильтры
           </button>
           <ul class="dropdown-menu dropdown-menu-end p-3" style="min-width: 250px;">
-            <li class="text-muted small">Фильтры будут добавлены позже</li>
+            <li class="mb-2">
+              <label class="form-label small fw-semibold">Пакет</label>
+              <select 
+                v-model="selectedPaketFilter" 
+                @change="handlePaketFilterChange"
+                class="form-select form-select-sm"
+              >
+                <option :value="null">Все пакеты</option>
+                <option 
+                  v-for="paket in availablePakets" 
+                  :key="paket.id" 
+                  :value="paket.id"
+                >
+                  {{ paket.name }}
+                </option>
+              </select>
+            </li>
           </ul>
         </div>
         
@@ -86,8 +102,40 @@
               <i class="bi bi-image text-muted"></i>
             </div>
           </template>
-          <template #cell-price="{ value }">
-            {{ formatPrice(value) }}
+          <template #cell-price="{ item }">
+            <div class="position-relative">
+              <button 
+                class="btn btn-sm btn-link text-decoration-none p-0"
+                @click.stop="togglePriceDropdown(item.id)"
+                style="color: inherit;"
+              >
+                {{ getPriceForDisplay(item) }}
+                <i class="bi bi-chevron-down ms-1" style="font-size: 10px;"></i>
+              </button>
+              
+              <!-- Price Dropdown -->
+              <div 
+                v-if="priceDropdownOpen[item.id]" 
+                class="position-absolute bg-white border rounded shadow-sm p-2"
+                style="top: 100%; left: 0; z-index: 1000; min-width: 200px;"
+                @click.stop
+              >
+                <div class="small fw-semibold mb-2">Цены по пакетам:</div>
+                <div v-if="item.paket_prices && item.paket_prices.length > 0">
+                  <div 
+                    v-for="paketPrice in item.paket_prices" 
+                    :key="paketPrice.id"
+                    class="d-flex justify-content-between align-items-center mb-1"
+                  >
+                    <span class="small">{{ getPaketName(paketPrice.paket_id) }}:</span>
+                    <span class="small fw-semibold">{{ formatPrice(paketPrice.price) }}</span>
+                  </div>
+                </div>
+                <div v-else class="text-muted small">
+                  Нет цен по пакетам
+                </div>
+              </div>
+            </div>
           </template>
           <template #cell-cost_price="{ value }">
             {{ formatPrice(value) }}
@@ -409,11 +457,152 @@
       class="modal-backdrop fade show"
       @click="closeViewModal"
     ></div>
+
+    <!-- Модальное окно управления ценами по пакетам -->
+    <div 
+      class="modal fade" 
+      :class="{ show: paketPricesModalOpen, 'd-block': paketPricesModalOpen }" 
+      :style="{ display: paketPricesModalOpen ? 'block' : 'none' }"
+      tabindex="-1"
+      role="dialog"
+      @click.self="closePaketPricesModal"
+    >
+      <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Управление ценами по пакетам
+              <span v-if="selectedProductForPricing" class="text-muted small"> - {{ selectedProductForPricing.name }}</span>
+            </h5>
+            <button 
+              type="button" 
+              class="btn-close" 
+              @click="closePaketPricesModal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="paketPricesError" class="alert alert-danger" role="alert">
+              {{ paketPricesError }}
+            </div>
+
+            <div v-if="paketPricesLoading" class="text-center py-4">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+              </div>
+            </div>
+
+            <div v-else>
+              <div v-if="selectedProductForPricing" class="alert alert-info mb-3">
+                <strong>Базовая цена товара:</strong> {{ formatPrice(selectedProductForPricing.price) }}
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 40%;">Пакет</th>
+                      <th style="width: 30%;">Цена</th>
+                      <th style="width: 30%;">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="paket in availablePakets" :key="paket.id">
+                      <td>
+                        <strong>{{ paket.name }}</strong>
+                      </td>
+                      <td>
+                        <div v-if="editingPrices[paket.id] !== undefined">
+                          <input 
+                            type="number" 
+                            v-model="editingPrices[paket.id]"
+                            class="form-control form-control-sm"
+                            placeholder="Введите цену"
+                            step="0.01"
+                            min="0"
+                            style="max-width: 150px;"
+                          />
+                        </div>
+                        <div v-else>
+                          <span 
+                            v-if="getPriceForPaket(paket.id) !== null" 
+                            class="badge bg-success"
+                          >
+                            {{ formatPrice(getPriceForPaket(paket.id)) }}
+                          </span>
+                          <span v-else class="badge bg-secondary">
+                            Не установлена
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div v-if="editingPrices[paket.id] !== undefined" class="d-flex gap-1">
+                          <button 
+                            class="btn btn-sm btn-success"
+                            @click="handleSavePrice(paket.id)"
+                            :disabled="savingPriceForPaket[paket.id]"
+                          >
+                            <i class="bi bi-check-lg"></i>
+                            {{ savingPriceForPaket[paket.id] ? 'Сохранение...' : 'Сохранить' }}
+                          </button>
+                          <button 
+                            class="btn btn-sm btn-secondary"
+                            @click="cancelEditingPrice(paket.id)"
+                            :disabled="savingPriceForPaket[paket.id]"
+                          >
+                            <i class="bi bi-x-lg"></i>
+                          </button>
+                        </div>
+                        <div v-else class="d-flex gap-1">
+                          <button 
+                            class="btn btn-sm btn-primary"
+                            @click="startEditingPrice(paket.id)"
+                          >
+                            <i class="bi bi-pencil"></i>
+                            {{ getPriceForPaket(paket.id) !== null ? 'Изменить' : 'Установить' }}
+                          </button>
+                          <button 
+                            v-if="getPriceForPaket(paket.id) !== null"
+                            class="btn btn-sm btn-danger"
+                            @click="handleDeletePrice(paket.id)"
+                            :disabled="savingPriceForPaket[paket.id]"
+                          >
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-if="availablePakets.length === 0" class="text-center text-muted py-4">
+                Нет доступных пакетов
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button 
+              type="button" 
+              class="btn btn-secondary" 
+              @click="closePaketPricesModal"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div 
+      v-if="paketPricesModalOpen" 
+      class="modal-backdrop fade show"
+      @click="closePaketPricesModal"
+    ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import DataTable from '../components/DataTable.vue'
 import FormModal from '../components/FormModal.vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
@@ -427,6 +616,8 @@ const currentPage = ref(Number(localStorage.getItem('products_page')) || 1)
 const totalPages = ref(1)
 const pageSize = ref(Number(localStorage.getItem('products_pageSize')) || 20)
 const searchQuery = ref('')
+const selectedPaketFilter = ref(null)
+const priceDropdownOpen = ref({})
 
 const addModalOpen = ref(false)
 const editModalOpen = ref(false)
@@ -436,6 +627,16 @@ const viewLoading = ref(false)
 const viewData = ref({})
 const deleteItemId = ref(null)
 const deleteItemName = ref('')
+
+// Paket Prices Modal State
+const paketPricesModalOpen = ref(false)
+const selectedProductForPricing = ref(null)
+const availablePakets = ref([])
+const productPaketPrices = ref([])
+const paketPricesLoading = ref(false)
+const paketPricesError = ref('')
+const editingPrices = ref({})
+const savingPriceForPaket = ref({})
 
 const deleteConfirmMessage = computed(() => {
   return `Вы уверены, что хотите удалить продукт "${deleteItemName.value}"? Это действие нельзя отменить.`
@@ -475,6 +676,11 @@ const actions = [
     label: 'Просмотр',
     icon: 'bi-eye',
     handler: (item) => openViewModal(item)
+  },
+  {
+    label: 'Управление ценами',
+    icon: 'bi-cash-stack',
+    handler: (item) => openPaketPricesModal(item)
   },
   {
     label: 'Изменить',
@@ -525,7 +731,13 @@ const fetchProducts = async () => {
       throw new Error('Токен авторизации не найден')
     }
 
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/`, {
+    // Build URL with paket filter if selected
+    let url = `${BACKEND_API_URL}/api/admin/products/`
+    if (selectedPaketFilter.value !== null) {
+      url += `?paket_id=${selectedPaketFilter.value}`
+    }
+
+    const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'accept': 'application/json'
@@ -872,8 +1084,285 @@ const handleDeleteProduct = async () => {
   }
 }
 
+// Paket Prices Management Functions
+const fetchPakets = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/pakets/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Ошибка при загрузке пакетов')
+    }
+
+    const data = await response.json()
+    availablePakets.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    console.error('Error fetching pakets:', err)
+    paketPricesError.value = err.message || 'Ошибка при загрузке пакетов'
+  }
+}
+
+const fetchProductPaketPrices = async (productId) => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${productId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Ошибка при загрузке цен')
+    }
+
+    const data = await response.json()
+    // Extract paket_prices from product response
+    productPaketPrices.value = Array.isArray(data.paket_prices) ? data.paket_prices : []
+  } catch (err) {
+    console.error('Error fetching product paket prices:', err)
+    paketPricesError.value = err.message || 'Ошибка при загрузке цен'
+  }
+}
+
+const getPriceForPaket = (paketId) => {
+  const priceEntry = productPaketPrices.value.find(p => p.paket_id === paketId)
+  return priceEntry ? priceEntry.price : null
+}
+
+const saveProductPaketPrice = async (productId, paketId, price) => {
+  try {
+    savingPriceForPaket.value[paketId] = true
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const priceValue = parseFloat(price)
+    if (isNaN(priceValue) || priceValue <= 0) {
+      throw new Error('Цена должна быть больше 0')
+    }
+
+    // Check if price already exists
+    const existingPrice = productPaketPrices.value.find(p => p.paket_id === paketId)
+    
+    let response
+    if (existingPrice) {
+      // Update existing price
+      response = await fetch(`${BACKEND_API_URL}/api/admin/products/${productId}/paket-prices/${paketId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: JSON.stringify({ price: priceValue })
+      })
+    } else {
+      // Create new price - paket_id as query parameter
+      response = await fetch(`${BACKEND_API_URL}/api/admin/products/${productId}/paket-prices?paket_id=${paketId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: JSON.stringify({
+          product_id: productId,
+          paket_id: paketId,
+          price: priceValue
+        })
+      })
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Ошибка при сохранении цены')
+    }
+
+    // Refresh prices
+    await fetchProductPaketPrices(productId)
+    delete editingPrices.value[paketId]
+  } catch (err) {
+    console.error('Error saving paket price:', err)
+    paketPricesError.value = err.message || 'Ошибка при сохранении цены'
+  } finally {
+    delete savingPriceForPaket.value[paketId]
+  }
+}
+
+const deleteProductPaketPrice = async (productId, paketId) => {
+  if (!confirm('Вы уверены, что хотите удалить эту цену?')) {
+    return
+  }
+
+  try {
+    savingPriceForPaket.value[paketId] = true
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${productId}/paket-prices/${paketId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Ошибка при удалении цены')
+    }
+
+    // Refresh prices
+    await fetchProductPaketPrices(productId)
+  } catch (err) {
+    console.error('Error deleting paket price:', err)
+    paketPricesError.value = err.message || 'Ошибка при удалении цены'
+  } finally {
+    delete savingPriceForPaket.value[paketId]
+  }
+}
+
+const openPaketPricesModal = async (item) => {
+  selectedProductForPricing.value = item
+  paketPricesModalOpen.value = true
+  paketPricesLoading.value = true
+  paketPricesError.value = ''
+  editingPrices.value = {}
+  savingPriceForPaket.value = {}
+  
+  // Fetch pakets and prices in parallel
+  await Promise.all([
+    fetchPakets(),
+    fetchProductPaketPrices(item.id)
+  ])
+  
+  paketPricesLoading.value = false
+}
+
+const closePaketPricesModal = () => {
+  paketPricesModalOpen.value = false
+  selectedProductForPricing.value = null
+  productPaketPrices.value = []
+  paketPricesError.value = ''
+  editingPrices.value = {}
+  savingPriceForPaket.value = {}
+}
+
+const startEditingPrice = (paketId) => {
+  const currentPrice = getPriceForPaket(paketId)
+  editingPrices.value[paketId] = currentPrice !== null ? currentPrice : ''
+}
+
+const cancelEditingPrice = (paketId) => {
+  delete editingPrices.value[paketId]
+}
+
+const handleSavePrice = async (paketId) => {
+  const price = editingPrices.value[paketId]
+  if (selectedProductForPricing.value && price !== undefined && price !== '') {
+    await saveProductPaketPrice(selectedProductForPricing.value.id, paketId, price)
+  }
+}
+
+const handleDeletePrice = async (paketId) => {
+  if (selectedProductForPricing.value) {
+    await deleteProductPaketPrice(selectedProductForPricing.value.id, paketId)
+  }
+}
+
+const getPriceForDisplay = (product) => {
+  // If paket filter is selected, show paket-specific price
+  if (selectedPaketFilter.value !== null && product.paket_prices) {
+    const paketPrice = product.paket_prices.find(p => p.paket_id === selectedPaketFilter.value)
+    if (paketPrice) {
+      return formatPrice(paketPrice.price)
+    }
+  }
+  // Otherwise show cost_price (base price)
+  return formatPrice(product.cost_price)
+}
+
+const getPaketName = (paketId) => {
+  const paket = availablePakets.value.find(p => p.id === paketId)
+  return paket ? paket.name : `Пакет ${paketId}`
+}
+
+const togglePriceDropdown = (productId) => {
+  // Close all other dropdowns
+  Object.keys(priceDropdownOpen.value).forEach(key => {
+    if (parseInt(key) !== productId) {
+      priceDropdownOpen.value[key] = false
+    }
+  })
+  // Toggle current dropdown
+  priceDropdownOpen.value[productId] = !priceDropdownOpen.value[productId]
+}
+
+const handlePaketFilterChange = () => {
+  currentPage.value = 1
+  fetchProducts()
+}
+
+// Close dropdowns when clicking outside
+const handleClickOutside = (event) => {
+  const target = event.target
+  if (!target.closest('.position-relative')) {
+    Object.keys(priceDropdownOpen.value).forEach(key => {
+      priceDropdownOpen.value[key] = false
+    })
+  }
+}
+
 onMounted(() => {
   fetchProducts()
+  fetchPakets()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
+<style scoped>
+.page-size-select {
+  width: 80px;
+}
+
+/* Price dropdown styles */
+.position-relative .btn-link:hover {
+  text-decoration: underline !important;
+}
+
+.position-relative .position-absolute {
+  animation: fadeIn 0.15s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
