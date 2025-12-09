@@ -33,6 +33,7 @@
           class="btn btn-primary d-flex align-items-center gap-2"
           style="font-size: 14px; background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128);"
           @click="openAddModal"
+          disabled
         >
           <i class="bi bi-plus-circle"></i>
           Добавить заказ
