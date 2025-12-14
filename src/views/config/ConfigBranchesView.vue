@@ -70,7 +70,21 @@
           :items="filteredItems"
           :actions="actions"
           class="h-100"
-        />
+        >
+          <template #cell-is_active="{ item }">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                :id="`switch-${item.id}`"
+                :checked="item.is_active"
+                @change="toggleActive(item)"
+                style="cursor: pointer;"
+              >
+            </div>
+          </template>
+        </DataTable>
       </div>
 
       <!-- Pagination -->
@@ -141,6 +155,20 @@
               v-model="formData.phone_number"
               placeholder="Введите номер телефона"
             />
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                id="is_active"
+                v-model="formData.is_active"
+              >
+              <label class="form-check-label" for="is_active">
+                Активен
+              </label>
+            </div>
           </div>
         </form>
       </template>
@@ -257,7 +285,8 @@ const formData = ref({
   code: '',
   name: '',
   address: '',
-  phone_number: ''
+  phone_number: '',
+  is_active: true
 })
 const editingId = ref(null)
 
@@ -275,11 +304,11 @@ const deleteConfirmMessage = computed(() => {
 })
 
 const columns = [
-  { key: 'id', label: 'ID' },
   { key: 'code', label: 'Код' },
   { key: 'name', label: 'Название' },
   { key: 'address', label: 'Адрес' },
-  { key: 'phone_number', label: 'Телефон' }
+  { key: 'phone_number', label: 'Телефон' },
+  { key: 'is_active', label: 'Активен' }
 ]
 
 const actions = [
@@ -412,7 +441,8 @@ const openAddModal = () => {
     code: '',
     name: '',
     address: '',
-    phone_number: ''
+    phone_number: '',
+    is_active: true
   }
   editingId.value = null
   formModalTitle.value = 'Добавить филиал'
@@ -487,7 +517,8 @@ const openEditModal = async (item) => {
       code: data.code || '',
       name: data.name || '',
       address: data.address || '',
-      phone_number: data.phone_number || ''
+      phone_number: data.phone_number || '',
+      is_active: data.is_active !== undefined ? data.is_active : true
     }
     formModalOpen.value = true
   } catch (err) {
@@ -502,7 +533,8 @@ const closeFormModal = () => {
     code: '',
     name: '',
     address: '',
-    phone_number: ''
+    phone_number: '',
+    is_active: true
   }
   editingId.value = null
 }
@@ -518,7 +550,8 @@ const handleSave = async () => {
       code: formData.value.code || null,
       name: formData.value.name || null,
       address: formData.value.address || null,
-      phone_number: formData.value.phone_number || null
+      phone_number: formData.value.phone_number || null,
+      is_active: formData.value.is_active
     }
 
     const url = editingId.value 
@@ -586,6 +619,39 @@ const handleDelete = async () => {
   } catch (err) {
     error.value = err.message || 'Ошибка при удалении филиала'
     console.error('Error deleting branch:', err)
+  }
+}
+
+const toggleActive = async (item) => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/branches/${item.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify({
+        is_active: !item.is_active
+      })
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
+      }
+      throw new Error(`Ошибка обновления статуса: ${response.status}`)
+    }
+
+    await fetchBranches()
+  } catch (err) {
+    error.value = err.message || 'Ошибка при изменении статуса филиала'
+    console.error('Error toggling branch status:', err)
   }
 }
 

@@ -76,15 +76,13 @@
               <th scope="col">Дата</th>
               <th scope="col" v-if="!cabinetId">Кабинет</th>
               <th scope="col">Статус</th>
-              <th scope="col">Объем слева</th>
-              <th scope="col">Объем справа</th>
               <th scope="col">Сумма</th>
               <th scope="col">Статус выплаты</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="bonuses.length === 0">
-              <td :colspan="cabinetId ? 6 : 7" class="text-center py-4 text-muted">
+              <td :colspan="cabinetId ? 4 : 5" class="text-center py-4 text-muted">
                 Нет данных
               </td>
             </tr>
@@ -92,28 +90,20 @@
               <td>{{ formatDate(bonus.created_at) }}</td>
               <td v-if="!cabinetId">
                 <div v-if="bonus.cabinet">
-                  <div class="fw-semibold">{{ formatName(bonus.cabinet.participant) }}</div>
-                  <div class="small text-muted">
-                    {{ bonus.cabinet.personal_number }}
-                    <span v-if="bonus.cabinet.sequence_number">
-                      (Каб. №{{ bonus.cabinet.sequence_number }})
-                    </span>
-                  </div>
+                  {{ formatName(bonus.cabinet.participant) }} ({{ bonus.cabinet.personal_number }})
                 </div>
                 <span v-else>-</span>
               </td>
               <td>
-                <span class="badge bg-info text-dark">
+                <span class="badge bg-info">
                   {{ getStatusName(bonus.status_id) }}
                 </span>
               </td>
-              <td>{{ bonus.left_volume_snapshot }}</td>
-              <td>{{ bonus.right_volume_snapshot }}</td>
-              <td class="fw-bold text-success">
+              <td>
                 {{ formatPrice(bonus.bonus_amount) }}
               </td>
               <td>
-                <span class="badge" :class="bonus.issued ? 'bg-success' : 'bg-warning text-dark'">
+                <span class="badge" :class="bonus.issued ? 'bg-success' : 'bg-warning'">
                   {{ bonus.issued ? 'Выплачен' : 'Ожидает' }}
                 </span>
               </td>
@@ -370,12 +360,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.table th {
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-.table td {
-  font-size: 0.9rem;
-}
-</style>
+

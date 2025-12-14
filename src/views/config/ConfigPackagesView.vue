@@ -79,6 +79,19 @@
             ></div>
             <span v-else>-</span>
           </template>
+          <template #cell-is_active="{ item }">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                :id="`switch-${item.id}`"
+                :checked="item.is_active"
+                @change="toggleActive(item)"
+                style="cursor: pointer;"
+              >
+            </div>
+          </template>
         </DataTable>
       </div>
 
@@ -220,6 +233,20 @@
               </div>
             </div>
           </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                id="is_active"
+                v-model="formData.is_active"
+              >
+              <label class="form-check-label" for="is_active">
+                Активен
+              </label>
+            </div>
+          </div>
         </form>
       </template>
     </FormModal>
@@ -347,7 +374,8 @@ const formData = ref({
   price: 0,
   referral_bonus: 0,
   binary_bonus_percentage: 0,
-  color: ''
+  color: '',
+  is_active: true
 })
 const editingId = ref(null)
 
@@ -369,12 +397,12 @@ const deleteConfirmMessage = computed(() => {
 })
 
 const columns = [
-  { key: 'id', label: 'ID' },
   { key: 'name', label: 'Название' },
   { key: 'price', label: 'Цена' },
   { key: 'referral_bonus', label: 'Реферальный бонус' },
   { key: 'binary_bonus_percentage', label: 'Бинарный бонус (%)' },
-  { key: 'color', label: 'Цвет' }
+  { key: 'color', label: 'Цвет' },
+  { key: 'is_active', label: 'Активен' }
 ]
 
 const actions = [
@@ -556,7 +584,8 @@ const openAddModal = () => {
     price: 0,
     referral_bonus: 0,
     binary_bonus_percentage: 0,
-    color: ''
+    color: '',
+    is_active: true
   }
   gradientColor1.value = '#8AA5D4'
   gradientColor2.value = '#2F4D81'
@@ -635,7 +664,8 @@ const openEditModal = async (item) => {
       price: parseFloat(data.price) || 0,
       referral_bonus: parseFloat(data.referral_bonus) || 0,
       binary_bonus_percentage: parseFloat(data.binary_bonus_percentage) || 0,
-      color: data.color || ''
+      color: data.color || '',
+      is_active: data.is_active !== undefined ? data.is_active : true
     }
     parseGradientColors(data.color)
     formModalOpen.value = true
@@ -652,7 +682,8 @@ const closeFormModal = () => {
     price: 0,
     referral_bonus: 0,
     binary_bonus_percentage: 0,
-    color: ''
+    color: '',
+    is_active: true
   }
   editingId.value = null
 }
@@ -669,7 +700,8 @@ const handleSave = async () => {
       price: formData.value.price,
       referral_bonus: formData.value.referral_bonus,
       binary_bonus_percentage: formData.value.binary_bonus_percentage,
-      color: formData.value.color
+      color: formData.value.color,
+      is_active: formData.value.is_active
     }
 
     const url = editingId.value 
@@ -737,6 +769,39 @@ const handleDelete = async () => {
   } catch (err) {
     error.value = err.message || 'Ошибка при удалении пакета'
     console.error('Error deleting package:', err)
+  }
+}
+
+const toggleActive = async (item) => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/pakets/${item.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify({
+        is_active: !item.is_active
+      })
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
+      }
+      throw new Error(`Ошибка обновления статуса: ${response.status}`)
+    }
+
+    await fetchPackages()
+  } catch (err) {
+    error.value = err.message || 'Ошибка при изменении статуса пакета'
+    console.error('Error toggling package status:', err)
   }
 }
 

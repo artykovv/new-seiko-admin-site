@@ -29,7 +29,7 @@
                   class="text-decoration-none"
                   @click="handleSearchResultClick"
                 >
-                  {{ participant.name }} {{ participant.lastname }} ({{ participant.personal_number }}) - Кабинет №{{ participant.sequence_number }}
+                  {{ participant.name }} {{ participant.lastname }} ({{ participant.personal_number }})
                 </router-link>
               </li>
             </ul>
@@ -62,15 +62,9 @@
       </div>
     </div>
 
-    <!-- Модальное окно просмотра участника -->
-    <ViewParticipantModal
-      :is-open="viewParticipantModalOpen"
-      :participant-id="selectedParticipantId"
-      @close="closeViewParticipantModal"
-      @openAddCabinet="handleOpenAddCabinet"
-    />
 
-    <!-- Модальное окно добавления кабинета -->
+
+    <!-- Модальное окно добавления -->
     <AddParticipantModal
       :is-open="addCabinetModalOpen"
       :branches="branches"
@@ -82,7 +76,7 @@
       @error="handleAddCabinetError"
     />
 
-    <!-- Модальное окно информации о кабинете -->
+    <!-- Модальное окно информации -->
     <CabinetDetailsModal
       :is-open="cabinetDetailsModalOpen"
       :cabinet-id="selectedCabinetId"
@@ -95,7 +89,6 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TreeNode from '../components/TreeNode.vue'
-import ViewParticipantModal from '../components/ViewParticipantModal.vue'
 import AddParticipantModal from '../components/AddParticipantModal.vue'
 import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
 import { BACKEND_API_URL } from '../config'
@@ -114,8 +107,6 @@ const searchLoading = ref(false)
 let searchTimeout = null
 
 // Модальные окна
-const viewParticipantModalOpen = ref(false)
-const selectedParticipantId = ref(null)
 const addCabinetModalOpen = ref(false)
 const preselectedParticipant = ref(null)
 const cabinetDetailsModalOpen = ref(false)
@@ -209,21 +200,9 @@ const handleSearchResultClick = () => {
   searchResults.value = []
 }
 
-const handleNodeClick = (participantId) => {
-  selectedParticipantId.value = participantId
-  viewParticipantModalOpen.value = true
-}
 
-const closeViewParticipantModal = () => {
-  viewParticipantModalOpen.value = false
-  selectedParticipantId.value = null
-}
 
-const handleOpenAddCabinet = (participant) => {
-  preselectedParticipant.value = participant
-  viewParticipantModalOpen.value = false
-  addCabinetModalOpen.value = true
-}
+
 
 const closeAddCabinetModal = () => {
   addCabinetModalOpen.value = false

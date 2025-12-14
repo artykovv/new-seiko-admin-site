@@ -36,8 +36,7 @@
                 <div class="card-body">
                   <h6 class="card-title">Добавляемый участник</h6>
                   <p class="mb-1"><strong>Номер:</strong> {{ participantInfo.personal_number || '-' }}</p>
-                  <p class="mb-1"><strong>ФИО:</strong> {{ formatFullName(participantInfo.participant) }}</p>
-                  <p class="mb-0"><strong>Номер кабинета:</strong> {{ participantInfo.sequence_number || '-' }}</p>
+                  <p class="mb-0"><strong>ФИО:</strong> {{ formatFullName(participantInfo.participant) }}</p>
                 </div>
               </div>
             </div>
@@ -48,8 +47,7 @@
                 <div class="card-body">
                   <h6 class="card-title">Спонсор</h6>
                   <p class="mb-1"><strong>Номер:</strong> {{ sponsorInfo.personal_number || '-' }}</p>
-                  <p class="mb-1"><strong>ФИО:</strong> {{ formatFullName(sponsorInfo.participant) }}</p>
-                  <p class="mb-0"><strong>Номер кабинета:</strong> {{ sponsorInfo.sequence_number || '-' }}</p>
+                  <p class="mb-0"><strong>ФИО:</strong> {{ formatFullName(sponsorInfo.participant) }}</p>
                 </div>
               </div>
             </div> -->
@@ -83,7 +81,6 @@
                     <div class="d-flex justify-content-between align-items-start">
                       <div class="flex-grow-1">
                         <div class="d-flex align-items-center gap-2 mb-1">
-                          <span class="badge bg-secondary">Кабинет №{{ position.sequence_number }}</span>
                           <span 
                             class="badge"
                             :class="getPositionBadgeClass(position.position)"
@@ -118,9 +115,6 @@
                   <div class="card">
                     <div class="card-body p-3 bg-light">
                       <div class="text-muted small mb-1">СПОНСОР</div>
-                      <div class="mb-1">
-                        <span class="badge bg-secondary">Кабинет №{{ sponsorInfo.sequence_number }}</span>
-                      </div>
                       <div class="fw-semibold">{{ formatFullName(sponsorInfo.participant) }}</div>
                       <small class="text-muted">{{ sponsorInfo.personal_number }}</small>
                     </div>
@@ -137,11 +131,6 @@
                       <div class="text-muted small mb-1">НАСТАВНИК</div>
                       
                       <div v-if="selectedPosition">
-                        <div class="mb-1">
-                          <span class="badge bg-secondary">
-                            Кабинет №{{ selectedPosition.sequence_number }}
-                          </span>
-                        </div>
                         <div class="fw-semibold">{{ formatFullName(selectedPosition) }}</div>
                         <small class="text-muted">{{ selectedPosition.personal_number }}</small>
                         

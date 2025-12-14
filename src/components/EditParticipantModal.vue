@@ -1,8 +1,8 @@
 <template>
   <FormModal
     :is-open="isOpen"
-    :title="modalTitle"
-    save-button-text="Сохранить"
+    title="Редактировать участника"
+    :save-button-text="'Сохранить'"
     @save="handleSave"
     @close="handleClose"
   >
@@ -13,33 +13,108 @@
         </div>
       </div>
 
-      <form v-else @submit.prevent="handleSave">
-        <!-- Переключатель режима -->
-        <div class="mb-4 d-flex justify-content-center">
-          <div class="mode-segmented-control">
-            <button 
-              type="button" 
-              class="mode-segment"
-              :class="{ 'mode-segment-active': mode === 'participant' }"
-              @click="switchMode('participant')"
-              :disabled="!participantId"
+      <form v-else @submit.prevent="handleSave" class="participant-form">
+        <!-- Индикатор этапов -->
+        <div class="steps-container mb-4">
+          <div class="steps-segmented-control">
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 1 }"
+              @click="currentStep = 1"
             >
-              Редактировать участника
-            </button>
-            <button 
-              type="button" 
-              class="mode-segment"
-              :class="{ 'mode-segment-active': mode === 'cabinet' }"
-              @click="switchMode('cabinet')"
-              :disabled="!cabinetId"
+              <span class="step-label">Учетные данные</span>
+            </div>
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 2 }"
+              @click="currentStep = 2"
             >
-              Редактировать кабинет
-            </button>
+              <span class="step-label">Личные данные</span>
+            </div>
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 3 }"
+              @click="currentStep = 3"
+            >
+              <span class="step-label">Данные</span>
+            </div>
           </div>
         </div>
 
-        <!-- Режим: Участник -->
-        <div v-if="mode === 'participant'">
+        <!-- Ошибки -->
+        <div v-if="error" class="alert alert-danger">
+          {{ error }}
+        </div>
+
+        <!-- Этап 1: Учетные данные -->
+        <div v-show="currentStep === 1">
+          <h6 class="mb-3">Учетные данные</h6>
+          
+          <div class="mb-3">
+            <label for="edit_email" class="form-label">Email</label>
+            <input 
+              type="email" 
+              class="form-control" 
+              id="edit_email" 
+              v-model="formData.email"
+              placeholder="user@example.com"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="edit_password" class="form-label">Новый пароль</label>
+            <div class="input-group">
+              <input 
+                :type="showPassword ? 'text' : 'password'"
+                class="form-control" 
+                id="edit_password" 
+                v-model="formData.password"
+                placeholder="Оставьте пустым, чтобы не менять"
+              />
+              <button 
+                class="btn btn-outline-secondary" 
+                type="button"
+                @click="showPassword = !showPassword"
+              >
+                <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+              </button>
+            </div>
+            <small class="form-text text-muted">Оставьте пустым, если не хотите менять пароль</small>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                id="edit_is_active"
+                v-model="formData.is_active"
+              />
+              <label class="form-check-label" for="edit_is_active">
+                Активен (доступ в систему)
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                role="switch" 
+                id="edit_is_verified"
+                v-model="formData.is_verified"
+              />
+              <label class="form-check-label" for="edit_is_verified">
+                Верифицирован
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Этап 2: Личные данные -->
+        <div v-show="currentStep === 2">
           <h6 class="mb-3">Личные данные</h6>
           
           <div class="mb-3">
@@ -48,7 +123,7 @@
               type="text" 
               class="form-control" 
               id="edit_lastname" 
-              v-model="participantForm.lastname"
+              v-model="formData.lastname"
               placeholder="Фамилия"
             />
           </div>
@@ -59,7 +134,7 @@
               type="text" 
               class="form-control" 
               id="edit_name" 
-              v-model="participantForm.name"
+              v-model="formData.name"
               placeholder="Имя"
             />
           </div>
@@ -70,52 +145,41 @@
               type="text" 
               class="form-control" 
               id="edit_patronymic" 
-              v-model="participantForm.patronymic"
+              v-model="formData.patronymic"
               placeholder="Отчество"
             />
           </div>
 
-          <div class="mb-3">
-            <label for="edit_email" class="form-label">Email</label>
-            <input 
-              type="email" 
-              class="form-control" 
-              id="edit_email" 
-              v-model="participantForm.email"
-              placeholder="Email"
-            />
-          </div>
-
           <h6 class="mb-3 mt-4">Паспортные данные</h6>
-          
+
           <div class="mb-3">
-            <label for="edit_phone" class="form-label">Телефон</label>
+            <label for="edit_phone_number" class="form-label">Телефон</label>
             <input 
               type="text" 
               class="form-control" 
-              id="edit_phone" 
-              v-model="participantForm.passport_info.phone_number"
-              placeholder="Номер телефона"
+              id="edit_phone_number" 
+              v-model="formData.passport_info.phone_number"
+              placeholder="+996..."
             />
           </div>
 
           <div class="mb-3">
-            <label for="edit_dob" class="form-label">Дата рождения</label>
+            <label for="edit_date_birth" class="form-label">Дата рождения</label>
             <input 
               type="date" 
               class="form-control" 
-              id="edit_dob" 
-              v-model="participantForm.passport_info.date_birth"
+              id="edit_date_birth" 
+              v-model="formData.passport_info.date_birth"
             />
           </div>
 
           <div class="mb-3">
-            <label for="edit_passport_id" class="form-label">Номер паспорта</label>
+            <label for="edit_passport_id" class="form-label">Номер документа</label>
             <input 
               type="text" 
               class="form-control" 
               id="edit_passport_id" 
-              v-model="participantForm.passport_info.passport_id"
+              v-model="formData.passport_info.passport_id"
               placeholder="Номер паспорта"
             />
           </div>
@@ -126,29 +190,29 @@
               type="text" 
               class="form-control" 
               id="edit_pin" 
-              v-model="participantForm.passport_info.pin"
+              v-model="formData.passport_info.pin"
               placeholder="ПИН"
             />
           </div>
 
           <div class="mb-3">
-            <label for="edit_issuer" class="form-label">Кем выдан</label>
+            <label for="edit_passport_issuer" class="form-label">Орган выдачи</label>
             <input 
               type="text" 
               class="form-control" 
-              id="edit_issuer" 
-              v-model="participantForm.passport_info.passport_issuer"
+              id="edit_passport_issuer" 
+              v-model="formData.passport_info.passport_issuer"
               placeholder="Кем выдан"
             />
           </div>
 
           <div class="mb-3">
-            <label for="edit_issue_date" class="form-label">Дата выдачи</label>
+            <label for="edit_passport_issue_date" class="form-label">Дата выдачи</label>
             <input 
               type="date" 
               class="form-control" 
-              id="edit_issue_date" 
-              v-model="participantForm.passport_info.passport_issue_date"
+              id="edit_passport_issue_date" 
+              v-model="formData.passport_info.passport_issue_date"
             />
           </div>
 
@@ -158,22 +222,105 @@
               type="text" 
               class="form-control" 
               id="edit_bank" 
-              v-model="participantForm.passport_info.bank"
-              placeholder="Банк"
+              v-model="formData.passport_info.bank"
+              placeholder="Название банка / Реквизиты"
             />
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="edit_ip_inn"
+                v-model="formData.passport_info.ip_inn"
+              />
+              <label class="form-check-label" for="edit_ip_inn">
+                ИП/ИНН
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="edit_pensioner"
+                v-model="formData.passport_info.pensioner"
+              />
+              <label class="form-check-label" for="edit_pensioner">
+                Пенсионер
+              </label>
+            </div>
           </div>
         </div>
 
-        <!-- Режим: Кабинет -->
-        <div v-if="mode === 'cabinet'">
-          <h6 class="mb-3">Данные кабинета</h6>
+        <!-- Этап 3: Данные -->
+        <div v-show="currentStep === 3">
+          <h6 class="mb-3">Данные</h6>
           
           <div class="mb-3">
-            <label for="cabinet_branch" class="form-label">Филиал</label>
+            <label for="edit_code" class="form-label">Код</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="edit_code" 
+              v-model="formData.cabinet.code"
+              placeholder="Код"
+              maxlength="5"
+              disabled
+            />
+            <small class="form-text text-muted">Код нельзя изменить</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Персональный номер</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              :value="personalNumber"
+              disabled
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="edit_paket" class="form-label">Пакет</label>
+            <div class="d-flex gap-2">
+              <select 
+                class="form-select" 
+                id="edit_paket" 
+                v-model.number="formData.cabinet.paket_id"
+                :disabled="isRegistered"
+              >
+                <option :value="null">Выберите пакет</option>
+                <option v-for="paket in pakets" :key="paket.id" :value="paket.id">
+                  {{ paket.name }} - {{ formatPrice(paket.price) }}
+                </option>
+              </select>
+              <button 
+                v-if="isRegistered"
+                type="button"
+                class="btn btn-primary"
+                style="background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128); white-space: nowrap;"
+                @click="handleUpgrade"
+              >
+                <i class="bi bi-arrow-up-circle me-1"></i>
+                Upgrade
+              </button>
+            </div>
+            <small v-if="isRegistered" class="form-text text-warning">
+              <i class="bi bi-info-circle me-1"></i>
+              Пакет нельзя изменить для зарегистрированных пользователей. Используйте кнопку Upgrade.
+            </small>
+          </div>
+
+          <div class="mb-3">
+            <label for="edit_branch" class="form-label">Филиал</label>
             <select 
               class="form-select" 
-              id="cabinet_branch" 
-              v-model.number="cabinetForm.branch_id"
+              id="edit_branch" 
+              v-model.number="formData.cabinet.branch_id"
             >
               <option :value="null">Выберите филиал</option>
               <option v-for="branch in branches" :key="branch.id" :value="branch.id">
@@ -183,67 +330,49 @@
           </div>
 
           <div class="mb-3">
-            <label for="cabinet_paket" class="form-label">Пакет</label>
-            <select 
-              class="form-select" 
-              id="cabinet_paket" 
-              v-model.number="cabinetForm.paket_id"
-            >
-              <option :value="null">Выберите пакет</option>
-              <option v-for="paket in pakets" :key="paket.id" :value="paket.id">
-                {{ paket.name }} - {{ formatPrice(paket.price) }}
-              </option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label for="search_sponsor" class="form-label">Спонсор</label>
+            <label for="edit_sponsor" class="form-label">Спонсор</label>
             <div class="position-relative">
               <input 
                 type="text" 
                 class="form-control" 
-                id="search_sponsor"
+                id="edit_sponsor"
                 v-model="sponsorSearchQuery"
                 @input="handleSponsorSearch"
                 placeholder="Поиск спонсора..."
-                :disabled="!!selectedSponsor"
                 autocomplete="off"
               />
-              <button 
-                v-if="selectedSponsor"
-                class="btn btn-link position-absolute end-0 top-0 text-decoration-none text-danger"
-                type="button"
-                @click="clearSponsor"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
               
-              <!-- Выпадающий список спонсоров -->
-              <div v-if="showSponsorDropdown && sponsorSearchResults.length > 0" class="dropdown-menu show w-100" style="max-height: 200px; overflow-y: auto;">
-                <a 
-                  v-for="sponsor in sponsorSearchResults" 
-                  :key="sponsor.id"
-                  class="dropdown-item" 
-                  href="#"
-                  @click.prevent="selectSponsor(sponsor)"
+              <div 
+                v-if="showSponsorDropdown && (sponsorSearchResults.length > 0 || sponsorSearchLoading)"
+                class="search-dropdown"
+              >
+                <div v-if="sponsorSearchLoading" class="dropdown-item text-center py-2">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                  </div>
+                </div>
+                <div 
+                  v-else
+                  v-for="cabinet in sponsorSearchResults" 
+                  :key="cabinet.id"
+                  class="dropdown-item participant-item"
+                  @click="selectSponsor(cabinet)"
                 >
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <div class="fw-semibold">{{ formatCabinetName(sponsor) }}</div>
-                      <small class="text-muted">{{ sponsor.personal_number }}</small>
+                      <div class="fw-semibold">{{ formatCabinetName(cabinet) }}</div>
+                      <small class="text-muted">{{ cabinet.personal_number }}</small>
                     </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
                   </div>
-                </a>
+                </div>
+                <div v-if="sponsorSearchResults.length === 0 && sponsorSearchQuery.trim()" class="dropdown-item text-muted text-center py-2">
+                  Спонсоры не найдены
+                </div>
               </div>
             </div>
-            <div v-if="selectedSponsor" class="form-text text-success">
-              Выбран спонсор: {{ formatCabinetName(selectedSponsor) }}
-            </div>
+            <small class="form-text text-muted">Текущий спонсор: {{ currentSponsorName }}</small>
           </div>
-        </div>
-
-        <div v-if="error" class="alert alert-danger mt-3">
-          {{ error }}
         </div>
       </form>
     </template>
@@ -251,20 +380,16 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import FormModal from './FormModal.vue'
 import { BACKEND_API_URL } from '../config'
 
 const props = defineProps({
   isOpen: {
     type: Boolean,
-    required: true
+    default: false
   },
   cabinetId: {
-    type: String,
-    default: null
-  },
-  participantId: {
     type: String,
     default: null
   },
@@ -278,59 +403,66 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'upgrade'])
 
-const mode = ref('participant') // 'participant' or 'cabinet'
+const currentStep = ref(1)
 const loading = ref(false)
-const saving = ref(false)
 const error = ref('')
+const showPassword = ref(false)
+const personalNumber = ref('')
+const currentSponsorName = ref('-')
+const isRegistered = ref(false)
 
-const modalTitle = computed(() => {
-  return mode.value === 'participant' ? 'Редактирование участника' : 'Редактирование кабинета'
-})
-
-// Participant Form Data
-const participantForm = ref({
+const formData = ref({
   email: '',
+  password: '',
   name: '',
   lastname: '',
   patronymic: '',
+  is_active: true,
+  is_verified: false,
   passport_info: {
-    phone_number: '',
-    date_birth: '',
-    passport_id: '',
     pin: '',
+    passport_id: '',
     passport_issuer: '',
     passport_issue_date: '',
-    bank: ''
+    bank: '',
+    ip_inn: false,
+    pensioner: false,
+    phone_number: '',
+    date_birth: ''
+  },
+  cabinet: {
+    code: '',
+    paket_id: null,
+    branch_id: null,
+    sponsor_id: null
   }
 })
 
-// Cabinet Form Data
-const cabinetForm = ref({
-  branch_id: null,
-  paket_id: null,
-  sponsor_id: null
-})
-
-// Sponsor Search
+// Поиск спонсора
 const sponsorSearchQuery = ref('')
 const sponsorSearchResults = ref([])
+const sponsorSearchLoading = ref(false)
 const showSponsorDropdown = ref(false)
 const selectedSponsor = ref(null)
-const sponsorSearchLoading = ref(false)
 let sponsorSearchTimeout = null
-
-const switchMode = (newMode) => {
-  mode.value = newMode
-}
 
 const formatCabinetName = (cabinet) => {
   if (!cabinet || !cabinet.participant) return '-'
-  const name = `${cabinet.participant.lastname || ''} ${cabinet.participant.name || ''}`.trim()
+  const name = formatParticipantName(cabinet.participant)
   const personalNumber = cabinet.personal_number || '-'
-  const sequenceNumber = cabinet.sequence_number || '-'
-  return `${name} (${personalNumber}) - Кабинет №${sequenceNumber}`
+  return `${name} (${personalNumber})`
+}
+
+const formatParticipantName = (participant) => {
+  if (!participant) return '-'
+  const parts = []
+  if (participant.lastname) parts.push(participant.lastname)
+  if (participant.name) parts.push(participant.name)
+  if (participant.patronymic) parts.push(participant.patronymic)
+  const name = parts.length > 0 ? parts.join(' ') : participant.email || '-'
+  return name
 }
 
 const formatPrice = (price) => {
@@ -339,65 +471,75 @@ const formatPrice = (price) => {
   return numPrice.toFixed(2) + ' $'
 }
 
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  return dateString.split('T')[0]
+}
+
 const loadData = async () => {
+  if (!props.cabinetId) return
+  
   loading.value = true
   error.value = ''
+  
   try {
     const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${props.cabinetId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
     
-    // Load Participant Data
-    if (props.participantId) {
-      const pResponse = await fetch(`${BACKEND_API_URL}/api/admin/participants/${props.participantId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (pResponse.ok) {
-        const pData = await pResponse.json()
-        participantForm.value = {
-          email: pData.email || '',
-          name: pData.name || '',
-          lastname: pData.lastname || '',
-          patronymic: pData.patronymic || '',
-          passport_info: {
-            phone_number: pData.passport_info?.phone_number || '',
-            date_birth: pData.passport_info?.date_birth ? pData.passport_info.date_birth.split('T')[0] : '',
-            passport_id: pData.passport_info?.passport_id || '',
-            pin: pData.passport_info?.pin || '',
-            passport_issuer: pData.passport_info?.passport_issuer || '',
-            passport_issue_date: pData.passport_info?.passport_issue_date ? pData.passport_info.passport_issue_date.split('T')[0] : '',
-            bank: pData.passport_info?.bank || ''
-          }
-        }
+    if (!response.ok) {
+      throw new Error('Ошибка загрузки данных')
+    }
+    
+    const data = await response.json()
+    
+    // Заполняем форму
+    formData.value = {
+      email: data.participant.email || '',
+      password: '',
+      name: data.participant.name || '',
+      lastname: data.participant.lastname || '',
+      patronymic: data.participant.patronymic || '',
+      is_active: data.participant.is_active,
+      is_verified: data.participant.is_verified,
+      passport_info: {
+        pin: data.participant.passport_info?.pin || '',
+        passport_id: data.participant.passport_info?.passport_id || '',
+        passport_issuer: data.participant.passport_info?.passport_issuer || '',
+        passport_issue_date: formatDate(data.participant.passport_info?.passport_issue_date) || '',
+        bank: data.participant.passport_info?.bank || '',
+        ip_inn: data.participant.passport_info?.ip_inn || false,
+        pensioner: data.participant.passport_info?.pensioner || false,
+        phone_number: data.participant.passport_info?.phone_number || '',
+        date_birth: formatDate(data.participant.passport_info?.date_birth) || ''
+      },
+      cabinet: {
+        code: data.code || '',
+        paket_id: data.paket_id,
+        branch_id: data.branch_id,
+        sponsor_id: data.sponsor_id
       }
     }
-
-    // Load Cabinet Data
-    if (props.cabinetId) {
-      const cResponse = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/${props.cabinetId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (cResponse.ok) {
-        const cData = await cResponse.json()
-        cabinetForm.value = {
-          branch_id: cData.branch_id,
-          paket_id: cData.paket_id,
-          sponsor_id: cData.sponsor_id
-        }
-        
-        // Load sponsor details if exists
-        if (cData.sponsor_id) {
-          const sResponse = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/${cData.sponsor_id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (sResponse.ok) {
-            selectedSponsor.value = await sResponse.json()
-            sponsorSearchQuery.value = formatCabinetName(selectedSponsor.value)
-          }
-        }
-      }
+    
+    personalNumber.value = data.personal_number || ''
+    isRegistered.value = data.registered || false
+    
+    // Устанавливаем текущего спонсора
+    if (data.sponsor) {
+      currentSponsorName.value = formatCabinetName(data.sponsor)
+      sponsorSearchQuery.value = currentSponsorName.value
+      selectedSponsor.value = data.sponsor
+    } else {
+      currentSponsorName.value = 'Нет спонсора'
+      sponsorSearchQuery.value = ''
     }
   } catch (err) {
     console.error('Error loading data:', err)
-    error.value = 'Ошибка при загрузке данных'
+    error.value = err.message || 'Ошибка при загрузке данных'
   } finally {
     loading.value = false
   }
@@ -405,15 +547,25 @@ const loadData = async () => {
 
 const handleSponsorSearch = () => {
   clearTimeout(sponsorSearchTimeout)
+  
   if (!sponsorSearchQuery.value.trim()) {
     sponsorSearchResults.value = []
     showSponsorDropdown.value = false
     return
   }
-  sponsorSearchTimeout = setTimeout(searchSponsors, 500)
+  
+  sponsorSearchTimeout = setTimeout(async () => {
+    await searchSponsors()
+  }, 500)
 }
 
 const searchSponsors = async () => {
+  if (!sponsorSearchQuery.value.trim()) {
+    sponsorSearchResults.value = []
+    return
+  }
+  
+  sponsorSearchLoading.value = true
   try {
     const token = localStorage.getItem('access_token')
     const params = new URLSearchParams({
@@ -421,137 +573,236 @@ const searchSponsors = async () => {
       page: '1',
       page_size: '20'
     })
+    
     const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/?${params.toString()}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
     })
+    
     if (response.ok) {
       const data = await response.json()
       sponsorSearchResults.value = data.cabinets || []
       showSponsorDropdown.value = true
     }
   } catch (err) {
-    console.error(err)
-  }
-}
-
-const selectSponsor = (sponsor) => {
-  selectedSponsor.value = sponsor
-  cabinetForm.value.sponsor_id = sponsor.id
-  sponsorSearchQuery.value = formatCabinetName(sponsor)
-  showSponsorDropdown.value = false
-}
-
-const clearSponsor = () => {
-  selectedSponsor.value = null
-  cabinetForm.value.sponsor_id = null
-  sponsorSearchQuery.value = ''
-  showSponsorDropdown.value = false
-}
-
-const handleSave = async () => {
-  saving.value = true
-  error.value = ''
-  try {
-    const token = localStorage.getItem('access_token')
-    
-    if (mode.value === 'participant' && props.participantId) {
-      // Update Participant
-      const response = await fetch(`${BACKEND_API_URL}/api/admin/participants/${props.participantId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(participantForm.value)
-      })
-      if (!response.ok) throw new Error('Failed to update participant')
-    } else if (mode.value === 'cabinet' && props.cabinetId) {
-      // Update Cabinet
-      const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/${props.cabinetId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(cabinetForm.value)
-      })
-      if (!response.ok) throw new Error('Failed to update cabinet')
-    }
-    
-    emit('success')
-    handleClose()
-  } catch (err) {
-    console.error('Error saving:', err)
-    error.value = 'Ошибка при сохранении'
+    console.error('Error searching sponsors:', err)
+    sponsorSearchResults.value = []
   } finally {
-    saving.value = false
+    sponsorSearchLoading.value = false
   }
+}
+
+const selectSponsor = (cabinet) => {
+  selectedSponsor.value = cabinet
+  formData.value.cabinet.sponsor_id = cabinet.id
+  sponsorSearchQuery.value = formatCabinetName(cabinet)
+  showSponsorDropdown.value = false
+}
+
+const handleUpgrade = () => {
+  emit('upgrade', {
+    cabinetId: props.cabinetId,
+    currentPaketId: formData.value.cabinet.paket_id
+  })
 }
 
 const handleClose = () => {
+  currentStep.value = 1
+  error.value = ''
+  showPassword.value = false
   emit('close')
 }
 
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    // Determine initial mode based on props
-    if (props.cabinetId) {
-      mode.value = 'cabinet'
-    } else if (props.participantId) {
-      mode.value = 'participant'
+const handleSave = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
     }
-    
-    loadData()
-  } else {
-    // Reset state
-    participantForm.value = {
-      email: '',
-      name: '',
-      lastname: '',
-      patronymic: '',
+
+    const payload = {
+      email: formData.value.email,
+      name: formData.value.name || null,
+      lastname: formData.value.lastname || null,
+      patronymic: formData.value.patronymic || null,
+      is_active: formData.value.is_active,
+      is_verified: formData.value.is_verified,
       passport_info: {
-        phone_number: '',
-        date_birth: '',
-        passport_id: '',
-        pin: '',
-        passport_issuer: '',
-        passport_issue_date: '',
-        bank: ''
+        pin: formData.value.passport_info.pin || null,
+        passport_id: formData.value.passport_info.passport_id || null,
+        passport_issuer: formData.value.passport_info.passport_issuer || null,
+        passport_issue_date: formData.value.passport_info.passport_issue_date || null,
+        bank: formData.value.passport_info.bank || null,
+        ip_inn: formData.value.passport_info.ip_inn,
+        pensioner: formData.value.passport_info.pensioner,
+        phone_number: formData.value.passport_info.phone_number || null,
+        date_birth: formData.value.passport_info.date_birth || null
+      },
+      cabinet: {
+        code: formData.value.cabinet.code,
+        paket_id: formData.value.cabinet.paket_id,
+        branch_id: formData.value.cabinet.branch_id,
+        sponsor_id: formData.value.cabinet.sponsor_id || null
       }
     }
-    cabinetForm.value = {
-      branch_id: null,
-      paket_id: null,
-      sponsor_id: null
+
+    // Добавляем пароль только если он заполнен
+    if (formData.value.password && formData.value.password.trim()) {
+      payload.password = formData.value.password
     }
-    clearSponsor()
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${props.cabinetId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Ошибка обновления: ${response.status}`)
+    }
+
+    emit('success')
+    emit('close')
+  } catch (err) {
+    error.value = err.message || 'Ошибка при сохранении'
+    console.error('Error saving:', err)
   }
+}
+
+watch(() => props.isOpen, (newValue) => {
+  if (newValue && props.cabinetId) {
+    loadData()
+  } else {
+    showSponsorDropdown.value = false
+  }
+})
+
+const handleClickOutside = (event) => {
+  const target = event.target
+  const sponsorInput = document.getElementById('sponsor')
+  const sponsorDropdown = document.querySelector('.search-dropdown')
+  
+  if (sponsorInput && sponsorDropdown && 
+      !sponsorInput.contains(target) && 
+      !sponsorDropdown.contains(target)) {
+    showSponsorDropdown.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
 <style scoped>
-.mode-segmented-control {
+.participant-form {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Steps Indicator - Navbar Style */
+.steps-container {
   display: flex;
-  background-color: #f1f3f5;
-  padding: 4px;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.steps-segmented-control {
+  display: inline-flex;
+  background-color: #f5f5f5;
   border-radius: 8px;
+  padding: 4px;
+  gap: 0;
 }
 
-.mode-segment {
-  padding: 8px 16px;
-  border: none;
-  background: none;
+.step-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 10px 20px;
+  color: #6c757d;
   border-radius: 6px;
-  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 500;
-  color: #495057;
+  white-space: nowrap;
+  background: transparent;
+  position: relative;
+  user-select: none;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.mode-segment-active {
-  background-color: white;
-  color: #000;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+.step-segment .step-label {
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.step-segment-active {
+  background-color: #ffffff !important;
+  color: rgb(0, 0, 128) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.step-segment-active .step-label {
+  color: rgb(0, 0, 128);
+  font-weight: 600;
+}
+
+.step-segment:hover:not(.step-segment-active) {
+  background-color: rgba(0, 0, 128, 0.05);
+}
+
+/* Search Dropdown */
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 0.25rem;
+}
+
+.dropdown-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.participant-item:hover {
+  background-color: #f8f9fa;
+}
+
+.participant-item .fw-semibold {
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.participant-item small {
+  font-size: 0.85rem;
 }
 </style>

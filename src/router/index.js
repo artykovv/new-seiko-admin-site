@@ -39,18 +39,9 @@ const routes = [
     },
     component: () => import('../views/RegistrationsView.vue')
   },
-  {
-    path: '/all-participants',
-    name: 'all-participants',
-    meta: {
-      title: 'Все участники',
-      icon: 'bi-people'
-    },
-    component: () => import('../views/AllParticipantsView.vue')
-  },
+
   {
     path: '/bonuses',
-    name: 'bonuses',
     meta: {
       title: 'Бонусы',
       icon: 'bi-stars',
@@ -97,7 +88,6 @@ const routes = [
   },
   {
     path: '/gifts',
-    name: 'gifts',
     meta: {
       title: 'Подарочные',
       icon: 'bi-bezier2',
@@ -182,7 +172,6 @@ const routes = [
   },
   {
     path: '/config',
-    name: 'config',
     meta: {
       title: 'Конфигурация',
       icon: 'bi-sliders2',
@@ -264,6 +253,16 @@ const routes = [
       hideInSidebar: true
     },
     component: () => import('../views/StructureView.vue')
+  },
+  {
+    path: '/print/blank/:cabinetId',
+    name: 'print-blank',
+    meta: {
+      title: 'Печать бланка',
+      hideInSidebar: true,
+      requiresAuth: true
+    },
+    component: () => import('../views/PrintBlankView.vue')
   }
 ]
 

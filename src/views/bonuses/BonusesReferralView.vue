@@ -88,13 +88,7 @@
         >
           <template #cell-cabinet="{ item }">
             <div>
-              <div class="fw-bold">
-                {{ item.cabinet.personal_number }}
-                <span class="text-muted fw-normal" v-if="item.cabinet.sequence_number">
-                  (№{{ item.cabinet.sequence_number }})
-                </span>
-              </div>
-              <div class="small text-muted">{{ formatFullName(item.cabinet.participant) }}</div>
+              {{ formatFullName(item.cabinet.participant) }} ({{ item.cabinet.personal_number }})
             </div>
           </template>
           <template #cell-referral_amount="{ value }">
@@ -152,6 +146,46 @@
       </div>
     </div>
   </div>
+
+  <!-- Confirmation Modal -->
+  <div 
+    class="modal fade" 
+    :class="{ show: confirmModalOpen, 'd-block': confirmModalOpen }" 
+    :style="{ display: confirmModalOpen ? 'block' : 'none' }"
+    tabindex="-1"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Выдать бонус</h5>
+          <button type="button" class="btn-close" @click="confirmModalOpen = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Тип бонуса:</label>
+            <div>{{ confirmData.bonusType }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Сумма:</label>
+            <div class="text-success fs-5">{{ confirmData.amount }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Участник:</label>
+            <div>{{ confirmData.participant }}</div>
+          </div>
+          <div class="alert alert-info mb-0">
+            <i class="bi bi-info-circle me-2"></i>
+            Подтвердите выдачу бонуса участнику.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="confirmModalOpen = false">Отмена</button>
+          <button type="button" class="btn btn-primary" @click="confirmIssue">Выдать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="confirmModalOpen" class="modal-backdrop fade show"></div>
 </template>
 
 <script setup>
@@ -167,6 +201,15 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
+
+// Modal states
+const confirmModalOpen = ref(false)
+const confirmData = ref({
+  bonusType: '',
+  amount: '',
+  participant: ''
+})
+const pendingItem = ref(null)
 
 const filters = ref({
   year: new Date().getFullYear(),
@@ -256,34 +299,58 @@ const fetchBonuses = async (page = 1) => {
   }
 }
 
-const issueBonus = async (item) => {
-  if (!confirm(`Выдать бонус для кабинета ${item.cabinet.personal_number}?`)) return
+const issueBonus = (item) => {
+  const year = filters.value.year || new Date().getFullYear()
+  const month = filters.value.month || new Date().getMonth() + 1
+  
+  pendingItem.value = item
+  confirmData.value = {
+    bonusType: `Реферальные бонусы за ${month}/${year}`,
+    amount: formatCurrency(item.pending_amount),
+    participant: `${formatFullName(item.cabinet.participant)} (${item.cabinet.personal_number})`
+  }
+  confirmModalOpen.value = true
+}
+
+const confirmIssue = async () => {
+  confirmModalOpen.value = false
+  
+  if (!pendingItem.value) return
+  
+  const item = pendingItem.value
+  const year = filters.value.year || new Date().getFullYear()
+  const month = filters.value.month || new Date().getMonth() + 1
 
   try {
     const token = localStorage.getItem('access_token')
     
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/bonuses/issue/referral`, {
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/bonuses/issue-monthly`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
       },
       body: JSON.stringify({
         cabinet_id: item.cabinet.id,
-        amount: item.pending_amount
+        year: year,
+        month: month,
+        bonus_type: 'referral'
       })
     })
 
     if (!response.ok) {
-      throw new Error('Failed to issue bonus')
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to issue bonus')
     }
 
     // Refresh data
     fetchBonuses(currentPage.value)
-    alert('Бонус успешно выдан')
   } catch (e) {
     console.error('Error issuing bonus:', e)
-    alert('Ошибка при выдаче бонуса (API endpoint might be missing)')
+    alert(`Ошибка при выдаче бонуса: ${e.message}`)
+  } finally {
+    pendingItem.value = null
   }
 }
 

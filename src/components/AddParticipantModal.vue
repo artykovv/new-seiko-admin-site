@@ -1,59 +1,75 @@
 <template>
   <FormModal
     :is-open="isOpen"
-    :title="modalTitle"
-    :save-button-text="saveButtonText"
-    @save="handleSave"
+    title="Добавить участника"
+    :save-button-text="currentStep === 3 ? 'Создать' : 'Далее'"
+    @save="handleNext"
     @close="handleClose"
   >
     <template #body>
-      <form @submit.prevent="handleSave" class="participant-form">
-        <!-- Переключатель режима -->
-        <div class="mb-4 d-flex justify-content-center">
-          <div class="mode-segmented-control">
-            <button 
-              type="button" 
-              class="mode-segment"
-              :class="{ 'mode-segment-active': mode === 'participant' }"
-              @click="switchMode('participant')"
+      <form @submit.prevent="handleNext" class="participant-form">
+        <!-- Индикатор этапов -->
+        <div class="steps-container mb-4">
+          <div class="steps-segmented-control">
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 1, 'step-segment-completed': currentStep > 1 }"
+              @click="currentStep > 1 && (currentStep = 1)"
+              :style="{ cursor: currentStep > 1 ? 'pointer' : 'default' }"
             >
-              Добавить участника
-            </button>
-            <button 
-              type="button" 
-              class="mode-segment"
-              :class="{ 'mode-segment-active': mode === 'cabinet' }"
-              @click="switchMode('cabinet')"
+              <span class="step-number">1</span>
+              <span class="step-label">Учетные данные</span>
+            </div>
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 2, 'step-segment-completed': currentStep > 2 }"
+              @click="currentStep > 2 && (currentStep = 2)"
+              :style="{ cursor: currentStep > 2 ? 'pointer' : 'default' }"
             >
-              Добавить кабинет
-            </button>
+              <span class="step-number">2</span>
+              <span class="step-label">Личные данные</span>
+            </div>
+            <div 
+              class="step-segment"
+              :class="{ 'step-segment-active': currentStep === 3 }"
+            >
+              <span class="step-number">3</span>
+              <span class="step-label">Данные</span>
+            </div>
           </div>
         </div>
 
-        <!-- Режим: Добавить участника -->
-        <div v-if="mode === 'participant'">
+        <!-- Ошибки валидации -->
+        <div v-if="validationErrors.length > 0" class="alert alert-danger">
+          <ul class="mb-0">
+            <li v-for="(error, index) in validationErrors" :key="index">{{ error }}</li>
+          </ul>
+        </div>
+
+        <!-- Этап 1: Учетные данные -->
+        <div v-show="currentStep === 1">
           <h6 class="mb-3">Учетные данные</h6>
+          
           <div class="mb-3">
-            <label for="add_email" class="form-label">Email <span class="text-danger">*</span></label>
+            <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
             <input 
               type="email" 
               class="form-control" 
-              id="add_email" 
-              v-model="participantForm.email"
+              id="email" 
+              v-model="formData.email"
               placeholder="user@example.com"
-              required
             />
           </div>
+
           <div class="mb-3">
-            <label for="add_password" class="form-label">Пароль <span class="text-danger">*</span></label>
+            <label for="password" class="form-label">Пароль <span class="text-danger">*</span></label>
             <div class="input-group">
               <input 
                 :type="showPassword ? 'text' : 'password'"
                 class="form-control" 
-                id="add_password" 
-                v-model="participantForm.password"
+                id="password" 
+                v-model="formData.password"
                 placeholder="Введите пароль"
-                required
               />
               <button 
                 class="btn btn-outline-secondary" 
@@ -64,179 +80,184 @@
               </button>
             </div>
           </div>
+        </div>
 
-          <hr class="my-4">
-          
+        <!-- Этап 2: Личные данные -->
+        <div v-show="currentStep === 2">
           <h6 class="mb-3">Личные данные</h6>
           
           <div class="mb-3">
-            <label for="add_lastname" class="form-label">Фамилия</label>
+            <label for="lastname" class="form-label">Фамилия</label>
             <input 
               type="text" 
               class="form-control" 
-              id="add_lastname" 
-              v-model="participantForm.lastname"
+              id="lastname" 
+              v-model="formData.lastname"
               placeholder="Фамилия"
             />
           </div>
 
           <div class="mb-3">
-            <label for="add_name" class="form-label">Имя</label>
+            <label for="name" class="form-label">Имя</label>
             <input 
               type="text" 
               class="form-control" 
-              id="add_name" 
-              v-model="participantForm.name"
+              id="name" 
+              v-model="formData.name"
               placeholder="Имя"
             />
           </div>
 
           <div class="mb-3">
-            <label for="add_patronymic" class="form-label">Отчество</label>
+            <label for="patronymic" class="form-label">Отчество</label>
             <input 
               type="text" 
               class="form-control" 
-              id="add_patronymic" 
-              v-model="participantForm.patronymic"
+              id="patronymic" 
+              v-model="formData.patronymic"
               placeholder="Отчество"
             />
           </div>
 
-          <div class="mb-3">
-            <label for="add_birth_date" class="form-label">Дата рождения</label>
-            <input 
-              type="date" 
-              class="form-control" 
-              id="add_birth_date" 
-              v-model="participantForm.passport_info.date_birth"
-            />
-          </div>
+          <h6 class="mb-3 mt-4">Паспортные данные</h6>
 
           <div class="mb-3">
-            <label for="add_passport_id" class="form-label">N документа</label>
+            <label for="phone_number" class="form-label">Телефон</label>
             <input 
               type="text" 
               class="form-control" 
-              id="add_passport_id" 
-              v-model="participantForm.passport_info.passport_id"
-              placeholder="Номер паспорта"
-            />
-          </div>
-
-          <div class="mb-3">
-            <label for="add_passport_issuer" class="form-label">Орган выдачи</label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="add_passport_issuer" 
-              v-model="participantForm.passport_info.passport_issuer"
-              placeholder="Кем выдан"
-            />
-          </div>
-
-          <div class="mb-3">
-            <label for="add_passport_issue_date" class="form-label">Дата выдачи</label>
-            <input 
-              type="date" 
-              class="form-control" 
-              id="add_passport_issue_date" 
-              v-model="participantForm.passport_info.passport_issue_date"
-            />
-          </div>
-
-          <div class="mb-3">
-            <label for="add_phone" class="form-label">Номер телефона</label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="add_phone" 
-              v-model="participantForm.passport_info.phone_number"
+              id="phone_number" 
+              v-model="formData.passport_info.phone_number"
               placeholder="+996..."
             />
           </div>
 
           <div class="mb-3">
-            <label for="add_bank" class="form-label">Банк</label>
+            <label for="date_birth" class="form-label">Дата рождения</label>
+            <input 
+              type="date" 
+              class="form-control" 
+              id="date_birth" 
+              v-model="formData.passport_info.date_birth"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="passport_id" class="form-label">Номер документа</label>
             <input 
               type="text" 
               class="form-control" 
-              id="add_bank" 
-              v-model="participantForm.passport_info.bank"
+              id="passport_id" 
+              v-model="formData.passport_info.passport_id"
+              placeholder="Номер паспорта"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="pin" class="form-label">ПИН</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="pin" 
+              v-model="formData.passport_info.pin"
+              placeholder="ПИН"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="passport_issuer" class="form-label">Орган выдачи</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="passport_issuer" 
+              v-model="formData.passport_info.passport_issuer"
+              placeholder="Кем выдан"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="passport_issue_date" class="form-label">Дата выдачи</label>
+            <input 
+              type="date" 
+              class="form-control" 
+              id="passport_issue_date" 
+              v-model="formData.passport_info.passport_issue_date"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="bank" class="form-label">Банк</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="bank" 
+              v-model="formData.passport_info.bank"
               placeholder="Название банка / Реквизиты"
             />
           </div>
-        </div>
 
-        <!-- Режим: Добавить кабинет -->
-        <div v-else>
-          <h6 class="mb-3">Выбор участника</h6>
           <div class="mb-3">
-            <label for="search_participant" class="form-label">Поиск участника <span class="text-danger">*</span></label>
-            <div class="position-relative">
+            <div class="form-check">
               <input 
-                type="text" 
-                class="form-control" 
-                id="search_participant" 
-                v-model="participantSearchQuery"
-                @input="handleParticipantSearch"
-                placeholder="Поиск по ФИО или email..."
-                autocomplete="off"
+                class="form-check-input" 
+                type="checkbox" 
+                id="ip_inn"
+                v-model="formData.passport_info.ip_inn"
               />
-              
-              <div 
-                v-if="showParticipantDropdown && (participantSearchResults.length > 0 || participantSearchLoading)"
-                class="search-dropdown"
-              >
-                <div v-if="participantSearchLoading" class="dropdown-item text-center py-2">
-                  <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Загрузка...</span>
-                  </div>
-                </div>
-                <div 
-                  v-else
-                  v-for="participant in participantSearchResults" 
-                  :key="participant.id"
-                  class="dropdown-item participant-item"
-                  @click="selectParticipant(participant)"
-                >
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                      <div class="fw-semibold">{{ formatParticipantName(participant) }}</div>
-                      <small class="text-muted">{{ participant.email }}</small>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted"></i>
-                  </div>
-                </div>
-                <div v-if="participantSearchResults.length === 0 && participantSearchQuery.trim()" class="dropdown-item text-muted text-center py-2">
-                  Участники не найдены
-                </div>
-              </div>
+              <label class="form-check-label" for="ip_inn">
+                ИП/ИНН
+              </label>
             </div>
           </div>
 
-          <hr class="my-4">
+          <div class="mb-3">
+            <div class="form-check">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="pensioner"
+                v-model="formData.passport_info.pensioner"
+              />
+              <label class="form-check-label" for="pensioner">
+                Пенсионер
+              </label>
+            </div>
+          </div>
+        </div>
 
-          <h6 class="mb-3">Данные кабинета</h6>
+        <!-- Этап 3: Данные -->
+        <div v-show="currentStep === 3">
+          <h6 class="mb-3">Данные</h6>
           
           <div class="mb-3">
-            <label for="cabinet_code" class="form-label">Код <span class="text-danger">*</span></label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="cabinet_code" 
-              v-model="cabinetForm.code"
-              placeholder="Введите код"
-              required
-            />
+            <label for="code" class="form-label">Код <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <input 
+                type="text" 
+                class="form-control" 
+                id="code" 
+                v-model="formData.cabinet.code"
+                placeholder="Введите код"
+                maxlength="5"
+              />
+              <button 
+                class="btn btn-outline-secondary" 
+                type="button"
+                @click="generateCode"
+                title="Сгенерировать новый код"
+              >
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+            <small class="form-text text-muted">Формат: 2 буквы + 3 цифры (например: AB123)</small>
           </div>
 
           <div class="mb-3">
-            <label for="cabinet_paket" class="form-label">Пакет <span class="text-danger">*</span></label>
+            <label for="paket" class="form-label">Пакет <span class="text-danger">*</span></label>
             <select 
               class="form-select" 
-              id="cabinet_paket" 
-              v-model.number="cabinetForm.paket_id"
-              required
+              id="paket" 
+              v-model.number="formData.cabinet.paket_id"
             >
               <option :value="null">Выберите пакет</option>
               <option v-for="paket in pakets" :key="paket.id" :value="paket.id">
@@ -246,12 +267,11 @@
           </div>
 
           <div class="mb-3">
-            <label for="cabinet_branch" class="form-label">Филиал <span class="text-danger">*</span></label>
+            <label for="branch" class="form-label">Филиал <span class="text-danger">*</span></label>
             <select 
               class="form-select" 
-              id="cabinet_branch" 
-              v-model.number="cabinetForm.branch_id"
-              required
+              id="branch" 
+              v-model.number="formData.cabinet.branch_id"
             >
               <option :value="null">Выберите филиал</option>
               <option v-for="branch in branches" :key="branch.id" :value="branch.id">
@@ -261,12 +281,12 @@
           </div>
 
           <div class="mb-3">
-            <label for="search_sponsor" class="form-label">Спонсор</label>
+            <label for="sponsor" class="form-label">Спонсор</label>
             <div class="position-relative">
               <input 
                 type="text" 
                 class="form-control" 
-                id="search_sponsor" 
+                id="sponsor"
                 v-model="sponsorSearchQuery"
                 @input="handleSponsorSearch"
                 placeholder="Поиск спонсора..."
@@ -305,6 +325,20 @@
             <small class="form-text text-muted">Оставьте пустым, если нет спонсора</small>
           </div>
         </div>
+
+        <!-- Кнопки навигации -->
+        <div class="d-flex justify-content-between mt-4">
+          <button 
+            v-if="currentStep > 1"
+            type="button" 
+            class="btn btn-secondary"
+            @click="previousStep"
+          >
+            <i class="bi bi-arrow-left me-1"></i>
+            Назад
+          </button>
+          <div v-else></div>
+        </div>
       </form>
     </template>
   </FormModal>
@@ -340,11 +374,11 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success', 'error'])
 
-const mode = ref('participant') // 'participant' или 'cabinet'
+const currentStep = ref(1)
 const showPassword = ref(false)
+const validationErrors = ref([])
 
-// Форма участника
-const participantForm = ref({
+const formData = ref({
   email: '',
   password: '',
   name: '',
@@ -360,25 +394,14 @@ const participantForm = ref({
     pensioner: false,
     phone_number: '',
     date_birth: ''
+  },
+  cabinet: {
+    code: '',
+    paket_id: null,
+    branch_id: null,
+    sponsor_id: null
   }
 })
-
-// Форма кабинета
-const cabinetForm = ref({
-  participant_id: null,
-  code: '',
-  paket_id: null,
-  branch_id: null,
-  sponsor_id: null
-})
-
-// Поиск участника
-const participantSearchQuery = ref('')
-const participantSearchResults = ref([])
-const participantSearchLoading = ref(false)
-const showParticipantDropdown = ref(false)
-const selectedParticipant = ref(null)
-let participantSearchTimeout = null
 
 // Поиск спонсора
 const sponsorSearchQuery = ref('')
@@ -388,17 +411,26 @@ const showSponsorDropdown = ref(false)
 const selectedSponsor = ref(null)
 let sponsorSearchTimeout = null
 
-const modalTitle = computed(() => {
-  return mode.value === 'participant' ? 'Добавить участника' : 'Добавить кабинет'
-})
+const formatCabinetName = (cabinet) => {
+  if (!cabinet || !cabinet.participant) return '-'
+  const name = formatParticipantName(cabinet.participant)
+  const personalNumber = cabinet.personal_number || '-'
+  return `${name} (${personalNumber})`
+}
 
-const saveButtonText = computed(() => {
-  return mode.value === 'participant' ? 'Добавить' : 'Создать кабинет'
-})
-
-const switchMode = (newMode) => {
-  mode.value = newMode
-  resetForms()
+const generateCode = () => {
+  // Генерируем 2 случайные заглавные буквы
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const letter1 = letters.charAt(Math.floor(Math.random() * letters.length))
+  const letter2 = letters.charAt(Math.floor(Math.random() * letters.length))
+  
+  // Генерируем 3 случайные цифры
+  const num1 = Math.floor(Math.random() * 10)
+  const num2 = Math.floor(Math.random() * 10)
+  const num3 = Math.floor(Math.random() * 10)
+  
+  // Формируем код
+  formData.value.cabinet.code = `${letter1}${letter2}${num1}${num2}${num3}`
 }
 
 const formatParticipantName = (participant) => {
@@ -411,88 +443,83 @@ const formatParticipantName = (participant) => {
   return name
 }
 
-const formatParticipantWithEmail = (participant) => {
-  if (!participant) return '-'
-  const name = formatParticipantName(participant)
-  return `${name} (${participant.email || '-'})`
-}
-
-const formatCabinetName = (cabinet) => {
-  if (!cabinet || !cabinet.participant) return '-'
-  const name = formatParticipantName(cabinet.participant)
-  const personalNumber = cabinet.personal_number || '-'
-  const sequenceNumber = cabinet.sequence_number || '-'
-  return `${name} (${personalNumber}) - Кабинет №${sequenceNumber}`
-}
-
 const formatPrice = (price) => {
   if (!price) return '0.00'
   const numPrice = typeof price === 'string' ? parseFloat(price) : price
   return numPrice.toFixed(2) + ' $'
 }
 
-const handleParticipantSearch = () => {
-  clearTimeout(participantSearchTimeout)
-  
-  if (!participantSearchQuery.value.trim()) {
-    participantSearchResults.value = []
-    showParticipantDropdown.value = false
-    return
+const validateStep1 = () => {
+  const errors = []
+  if (!formData.value.email || !formData.value.email.trim()) {
+    errors.push('Email обязателен для заполнения')
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email)) {
+    errors.push('Введите корректный email')
   }
-  
-  participantSearchTimeout = setTimeout(async () => {
-    await searchParticipants()
-  }, 500)
+  if (!formData.value.password || !formData.value.password.trim()) {
+    errors.push('Пароль обязателен для заполнения')
+  } else if (formData.value.password.length < 6) {
+    errors.push('Пароль должен содержать минимум 6 символов')
+  }
+  return errors
 }
 
-const searchParticipants = async () => {
-  if (!participantSearchQuery.value.trim()) {
-    participantSearchResults.value = []
-    return
+const validateStep2 = () => {
+  const errors = []
+  // Этап 2 не имеет обязательных полей, но можно добавить валидацию при необходимости
+  return errors
+}
+
+const validateStep3 = () => {
+  const errors = []
+  if (!formData.value.cabinet.code || !formData.value.cabinet.code.trim()) {
+    errors.push('Код обязателен для заполнения')
   }
+  if (!formData.value.cabinet.paket_id) {
+    errors.push('Выберите пакет')
+  }
+  if (!formData.value.cabinet.branch_id) {
+    errors.push('Выберите филиал')
+  }
+  return errors
+}
+
+const handleNext = () => {
+  validationErrors.value = []
   
-  participantSearchLoading.value = true
-  try {
-    const token = localStorage.getItem('access_token')
-    const params = new URLSearchParams({
-      search: participantSearchQuery.value.trim(),
-      page: '1',
-      page_size: '20'
-    })
-    
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/participants/?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      participantSearchResults.value = data.participants || []
-      showParticipantDropdown.value = true
+  if (currentStep.value === 1) {
+    const errors = validateStep1()
+    if (errors.length > 0) {
+      validationErrors.value = errors
+      return
     }
-  } catch (err) {
-    console.error('Error searching participants:', err)
-    participantSearchResults.value = []
-  } finally {
-    participantSearchLoading.value = false
+    currentStep.value = 2
+  } else if (currentStep.value === 2) {
+    const errors = validateStep2()
+    if (errors.length > 0) {
+      validationErrors.value = errors
+      return
+    }
+    currentStep.value = 3
+    // Автоматически генерируем код, если он пустой
+    if (!formData.value.cabinet.code) {
+      generateCode()
+    }
+  } else if (currentStep.value === 3) {
+    const errors = validateStep3()
+    if (errors.length > 0) {
+      validationErrors.value = errors
+      return
+    }
+    handleSave()
   }
 }
 
-const selectParticipant = (participant) => {
-  selectedParticipant.value = participant
-  cabinetForm.value.participant_id = participant.id
-  participantSearchQuery.value = formatParticipantWithEmail(participant)
-  showParticipantDropdown.value = false
-}
-
-const clearParticipant = () => {
-  selectedParticipant.value = null
-  cabinetForm.value.participant_id = null
-  participantSearchQuery.value = ''
-  participantSearchResults.value = []
-  showParticipantDropdown.value = false
+const previousStep = () => {
+  validationErrors.value = []
+  if (currentStep.value > 1) {
+    currentStep.value--
+  }
 }
 
 const handleSponsorSearch = () => {
@@ -546,21 +573,23 @@ const searchSponsors = async () => {
 
 const selectSponsor = (cabinet) => {
   selectedSponsor.value = cabinet
-  cabinetForm.value.sponsor_id = cabinet.id
+  formData.value.cabinet.sponsor_id = cabinet.id
   sponsorSearchQuery.value = formatCabinetName(cabinet)
   showSponsorDropdown.value = false
 }
 
 const clearSponsor = () => {
   selectedSponsor.value = null
-  cabinetForm.value.sponsor_id = null
+  formData.value.cabinet.sponsor_id = null
   sponsorSearchQuery.value = ''
   sponsorSearchResults.value = []
   showSponsorDropdown.value = false
 }
 
-const resetForms = () => {
-  participantForm.value = {
+const resetForm = () => {
+  currentStep.value = 1
+  validationErrors.value = []
+  formData.value = {
     email: '',
     password: '',
     name: '',
@@ -576,53 +605,98 @@ const resetForms = () => {
       pensioner: false,
       phone_number: '',
       date_birth: ''
+    },
+    cabinet: {
+      code: '',
+      paket_id: null,
+      branch_id: null,
+      sponsor_id: null
     }
   }
-  
-  cabinetForm.value = {
-    participant_id: null,
-    code: '',
-    paket_id: null,
-    branch_id: null,
-    sponsor_id: null
-  }
-  
   showPassword.value = false
-  clearParticipant()
   clearSponsor()
+}
+
+const handleClose = () => {
+  resetForm()
+  emit('close')
+}
+
+const handleSave = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const payload = {
+      email: formData.value.email,
+      password: formData.value.password,
+      name: formData.value.name || null,
+      lastname: formData.value.lastname || null,
+      patronymic: formData.value.patronymic || null,
+      passport_info: {
+        pin: formData.value.passport_info.pin || null,
+        passport_id: formData.value.passport_info.passport_id || null,
+        passport_issuer: formData.value.passport_info.passport_issuer || null,
+        passport_issue_date: formData.value.passport_info.passport_issue_date || null,
+        bank: formData.value.passport_info.bank || null,
+        ip_inn: formData.value.passport_info.ip_inn,
+        pensioner: formData.value.passport_info.pensioner,
+        phone_number: formData.value.passport_info.phone_number || null,
+        date_birth: formData.value.passport_info.date_birth || null
+      },
+      cabinet: {
+        code: formData.value.cabinet.code,
+        paket_id: formData.value.cabinet.paket_id,
+        branch_id: formData.value.cabinet.branch_id,
+        sponsor_id: formData.value.cabinet.sponsor_id || null
+      }
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
+      }
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Ошибка создания: ${response.status}`)
+    }
+
+    resetForm()
+    emit('success')
+    emit('close')
+  } catch (err) {
+    emit('error', err.message || 'Ошибка при создании участника')
+    console.error('Error adding participant:', err)
+  }
 }
 
 watch(() => props.isOpen, (newValue) => {
   if (newValue) {
-    resetForms()
-    // Если передан предвыбранный участник, переключаемся на режим кабинета
-    if (props.preselectedParticipant) {
-      mode.value = 'cabinet'
-      selectedParticipant.value = props.preselectedParticipant
-      cabinetForm.value.participant_id = props.preselectedParticipant.id
-      participantSearchQuery.value = formatParticipantWithEmail(props.preselectedParticipant)
-    }
+    resetForm()
   } else {
-    showParticipantDropdown.value = false
     showSponsorDropdown.value = false
   }
 })
 
 const handleClickOutside = (event) => {
   const target = event.target
-  const participantInput = document.getElementById('search_participant')
-  const participantDropdown = document.querySelector('.search-dropdown')
-  const sponsorInput = document.getElementById('search_sponsor')
+  const sponsorInput = document.getElementById('sponsor')
+  const sponsorDropdown = document.querySelector('.search-dropdown')
   
-  if (participantInput && participantDropdown && 
-      !participantInput.contains(target) && 
-      !participantDropdown.contains(target)) {
-    showParticipantDropdown.value = false
-  }
-  
-  if (sponsorInput && participantDropdown && 
+  if (sponsorInput && sponsorDropdown && 
       !sponsorInput.contains(target) && 
-      !participantDropdown.contains(target)) {
+      !sponsorDropdown.contains(target)) {
     showSponsorDropdown.value = false
   }
 }
@@ -634,118 +708,6 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
-
-const handleClose = () => {
-  resetForms()
-  emit('close')
-}
-
-const handleSave = async () => {
-  if (mode.value === 'participant') {
-    await saveParticipant()
-  } else {
-    await saveCabinet()
-  }
-}
-
-const saveParticipant = async () => {
-  try {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      throw new Error('Токен авторизации не найден')
-    }
-
-    const payload = {
-      email: participantForm.value.email,
-      password: participantForm.value.password,
-      name: participantForm.value.name || null,
-      lastname: participantForm.value.lastname || null,
-      patronymic: participantForm.value.patronymic || null,
-      passport_info: {
-        pin: participantForm.value.passport_info.pin || null,
-        passport_id: participantForm.value.passport_info.passport_id || null,
-        passport_issuer: participantForm.value.passport_info.passport_issuer || null,
-        passport_issue_date: participantForm.value.passport_info.passport_issue_date || null,
-        bank: participantForm.value.passport_info.bank || null,
-        ip_inn: participantForm.value.passport_info.ip_inn,
-        pensioner: participantForm.value.passport_info.pensioner,
-        phone_number: participantForm.value.passport_info.phone_number || null,
-        date_birth: participantForm.value.passport_info.date_birth || null
-      }
-    }
-
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/participants/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    })
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
-      }
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Ошибка создания: ${response.status}`)
-    }
-
-    resetForms()
-    emit('success')
-    emit('close')
-  } catch (err) {
-    emit('error', err.message || 'Ошибка при создании участника')
-    console.error('Error adding participant:', err)
-  }
-}
-
-const saveCabinet = async () => {
-  try {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      throw new Error('Токен авторизации не найден')
-    }
-
-    if (!cabinetForm.value.participant_id) {
-      throw new Error('Выберите участника')
-    }
-
-    const payload = {
-      participant_id: cabinetForm.value.participant_id,
-      code: cabinetForm.value.code,
-      paket_id: cabinetForm.value.paket_id,
-      branch_id: cabinetForm.value.branch_id,
-      sponsor_id: cabinetForm.value.sponsor_id || null
-    }
-
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    })
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
-      }
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Ошибка создания: ${response.status}`)
-    }
-
-    resetForms()
-    emit('success')
-    emit('close')
-  } catch (err) {
-    emit('error', err.message || 'Ошибка при создании кабинета')
-    console.error('Error adding cabinet:', err)
-  }
-}
 </script>
 
 <style scoped>
@@ -754,6 +716,91 @@ const saveCabinet = async () => {
   overflow-y: auto;
 }
 
+/* Steps Indicator - Navbar Style */
+.steps-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.steps-segmented-control {
+  display: inline-flex;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 0;
+}
+
+.step-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 10px 20px;
+  color: #6c757d;
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  white-space: nowrap;
+  background: transparent;
+  position: relative;
+  user-select: none;
+}
+
+.step-segment .step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #dee2e6;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.step-segment .step-label {
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.step-segment-active {
+  background-color: #ffffff !important;
+  color: rgb(0, 0, 128) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.step-segment-active .step-number {
+  background-color: rgb(0, 0, 128);
+  color: white;
+}
+
+.step-segment-active .step-label {
+  color: rgb(0, 0, 128);
+  font-weight: 600;
+}
+
+.step-segment-completed {
+  color: #28a745;
+}
+
+.step-segment-completed .step-number {
+  background-color: #28a745;
+  color: white;
+}
+
+.step-segment-completed .step-label {
+  color: #495057;
+}
+
+.step-segment-completed:hover {
+  background-color: rgba(40, 167, 69, 0.1);
+  transition: background-color 0.2s ease;
+}
+
+/* Search Dropdown */
 .search-dropdown {
   position: absolute;
   top: 100%;
@@ -791,47 +838,5 @@ const saveCabinet = async () => {
 
 .participant-item small {
   font-size: 0.85rem;
-}
-
-/* Mode Segmented Control - matching Navbar style */
-.mode-segmented-control {
-  display: inline-flex;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-  padding: 4px;
-  gap: 0;
-}
-
-.mode-segment {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 20px;
-  color: #212529;
-  text-decoration: none;
-  border-radius: 6px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 500;
-  white-space: nowrap;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.mode-segment:hover {
-  color: rgb(0, 0, 128);
-  transition: color 0.2s ease;
-}
-
-.mode-segment-active {
-  background-color: #ffffff !important;
-  color: rgb(0, 0, 128) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.mode-segment-active:hover {
-  background-color: #ffffff !important;
-  color: rgb(0, 0, 128) !important;
 }
 </style>

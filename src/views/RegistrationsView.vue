@@ -136,13 +136,7 @@
           class="h-100"
         >
           <template #cell-fullname="{ item }">
-            <span 
-              class="text-primary" 
-              style="cursor: pointer; text-decoration: underline;"
-              @click="openViewParticipantModal(item)"
-            >
-              {{ formatFullName(item) }}
-            </span>
+            <span>{{ formatFullName(item) }}</span>
           </template>
           <template #cell-personal_number="{ item }">
             <span 
@@ -199,19 +193,15 @@
       @error="handleAddToStructureError"
     />
 
-    <!-- Модальное окно просмотра участника -->
-    <ViewParticipantModal
-      :is-open="viewParticipantModalOpen"
-      :participant-id="selectedParticipantId"
-      @close="closeViewParticipantModal"
-      @openAddCabinet="handleOpenAddCabinet"
-    />
 
-    <!-- Модальное окно информации о кабинете -->
+
+    <!-- Модальное окно информации -->
     <CabinetDetailsModal
       :is-open="cabinetDetailsModalOpen"
       :cabinet-id="selectedCabinetId"
+      :initial-tab="initialTab"
       @close="closeCabinetDetailsModal"
+      @navigate="handleCabinetNavigate"
     />
 
     <!-- Модальное окно личников -->
@@ -225,20 +215,70 @@
     <EditParticipantModal
       :is-open="editModalOpen"
       :cabinet-id="selectedCabinetIdForEdit"
-      :participant-id="selectedParticipantIdForEdit"
       :branches="branches"
       :pakets="pakets"
       @close="closeEditModal"
       @success="handleEditSuccess"
+      @upgrade="handleOpenUpgrade"
+    />
+
+    <!-- Модальное окно Upgrade -->
+    <UpgradeModal
+      :is-open="upgradeModalOpen"
+      :cabinet-id="selectedCabinetIdForUpgrade"
+      :current-paket-id="currentPaketIdForUpgrade"
+      :pakets="pakets"
+      @close="closeUpgradeModal"
+      @back="handleBackToEdit"
+      @success="handleUpgradeSuccess"
     />
 
     <!-- Модальное окно бонусов -->
     <BonusesModal
       :is-open="bonusesModalOpen"
       :cabinet-id="selectedCabinetIdForBonuses"
-      :participant-id="selectedParticipantIdForBonuses"
       @close="closeBonusesModal"
     />
+
+    <!-- Delete Confirmation Modal -->
+    <div 
+      class="modal fade" 
+      :class="{ show: deleteModalOpen, 'd-block': deleteModalOpen }" 
+      :style="{ display: deleteModalOpen ? 'block' : 'none' }"
+      tabindex="-1"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">Подтверждение удаления</h5>
+            <button type="button" class="btn-close btn-close-white" @click="deleteModalOpen = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <strong>Внимание!</strong> Это действие необратимо.
+            </div>
+            <p class="mb-2"><strong>Вы действительно хотите удалить участника?</strong></p>
+            <div v-if="itemToDelete" class="mt-3">
+              <div class="mb-2">
+                <strong>ФИО:</strong> {{ formatFullName(itemToDelete) }}
+              </div>
+              <div class="mb-2">
+                <strong>Персональный номер:</strong> {{ itemToDelete.personal_number }}
+              </div>
+              <div class="mb-2">
+                <strong>Пакет:</strong> {{ itemToDelete.paket?.name || '-' }}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="deleteModalOpen = false">Отмена</button>
+            <button type="button" class="btn btn-danger" @click="confirmDelete">Удалить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="deleteModalOpen" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
@@ -247,10 +287,10 @@ import { ref, onMounted, computed, watch } from 'vue'
 import DataTable from '../components/DataTable.vue'
 import AddParticipantModal from '../components/AddParticipantModal.vue'
 import AddToStructureModal from '../components/AddToStructureModal.vue'
-import ViewParticipantModal from '../components/ViewParticipantModal.vue'
 import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
 import PersonalCabinetsModal from '../components/PersonalCabinetsModal.vue'
 import EditParticipantModal from '../components/EditParticipantModal.vue'
+import UpgradeModal from '../components/UpgradeModal.vue'
 import BonusesModal from '../components/BonusesModal.vue'
 import { BACKEND_API_URL } from '../config'
 
@@ -275,13 +315,12 @@ const sortByCreatedAt = ref(null)
 const addModalOpen = ref(false)
 const addToStructureModalOpen = ref(false)
 const selectedCabinetIdForStructure = ref(null)
-const viewParticipantModalOpen = ref(false)
-const selectedParticipantId = ref(null)
 const preselectedParticipant = ref(null)
 
 // Cabinet details modal
 const cabinetDetailsModalOpen = ref(false)
 const selectedCabinetId = ref(null)
+const initialTab = ref('participant')
 
 // Personal cabinets modal
 const personalCabinetsModalOpen = ref(false)
@@ -297,13 +336,21 @@ const bonusesModalOpen = ref(false)
 const selectedCabinetIdForBonuses = ref(null)
 const selectedParticipantIdForBonuses = ref(null)
 
+// Upgrade modal
+const upgradeModalOpen = ref(false)
+const selectedCabinetIdForUpgrade = ref(null)
+const currentPaketIdForUpgrade = ref(null)
+
+// Delete modal
+const deleteModalOpen = ref(false)
+const itemToDelete = ref(null)
+
 const columns = [
   { key: 'branch_name', label: 'Филиал' },
   { key: 'personal_number', label: 'Номер' },
   { key: 'fullname', label: 'ФИО' },
   { key: 'paket_name', label: 'Пакет' },
   { key: 'status_name', label: 'Статус' },
-  { key: 'sequence_number', label: 'Номер кабинета' },
   { key: 'created_at', label: 'Дата создания' }
 ]
 
@@ -316,23 +363,23 @@ const actions = [
   {
     label: 'Личники',
     icon: 'bi-people',
-    handler: (item) => openPersonalCabinetsModal(item.id)
+    handler: (item) => openCabinetDetailsModal(item.id, 'personal')
   },
   {
     label: 'Бонусы',
     icon: 'bi-cash-coin',
-    handler: (item) => openBonusesModal(item)
+    handler: (item) => openCabinetDetailsModal(item.id, 'bonuses')
   },
   {
     label: 'Изменить',
     icon: 'bi-pencil',
-    handler: (item) => console.log('Edit', item)
+    handler: (item) => openEditModal(item)
   },
   {
     label: 'Удалить',
     icon: 'bi-trash',
     class: 'text-danger',
-    handler: (item) => console.log('Delete', item)
+    handler: (item) => openDeleteModal(item)
   }
 ]
 
@@ -625,24 +672,22 @@ const handleAddToStructureError = (errorMessage) => {
   error.value = errorMessage
 }
 
-const openViewParticipantModal = (item) => {
-  selectedParticipantId.value = item.participant_id
-  viewParticipantModalOpen.value = true
-}
 
-const closeViewParticipantModal = () => {
-  viewParticipantModalOpen.value = false
-  selectedParticipantId.value = null
-}
 
-const openCabinetDetailsModal = (cabinetId) => {
+const openCabinetDetailsModal = (cabinetId, tab = 'participant') => {
   selectedCabinetId.value = cabinetId
+  initialTab.value = tab
   cabinetDetailsModalOpen.value = true
 }
 
 const closeCabinetDetailsModal = () => {
   cabinetDetailsModalOpen.value = false
   selectedCabinetId.value = null
+  initialTab.value = 'participant'
+}
+
+const handleCabinetNavigate = (cabinetId) => {
+  selectedCabinetId.value = cabinetId
 }
 
 const openPersonalCabinetsModal = (sponsorId) => {
@@ -671,6 +716,29 @@ const handleEditSuccess = () => {
   fetchParticipants(currentPage.value)
 }
 
+const handleOpenUpgrade = (data) => {
+  selectedCabinetIdForUpgrade.value = data.cabinetId
+  currentPaketIdForUpgrade.value = data.currentPaketId
+  editModalOpen.value = false
+  upgradeModalOpen.value = true
+}
+
+const closeUpgradeModal = () => {
+  upgradeModalOpen.value = false
+  selectedCabinetIdForUpgrade.value = null
+  currentPaketIdForUpgrade.value = null
+}
+
+const handleBackToEdit = () => {
+  upgradeModalOpen.value = false
+  editModalOpen.value = true
+}
+
+const handleUpgradeSuccess = () => {
+  upgradeModalOpen.value = false
+  fetchParticipants(currentPage.value)
+}
+
 const openBonusesModal = (item) => {
   selectedCabinetIdForBonuses.value = item.id
   selectedParticipantIdForBonuses.value = item.participant_id
@@ -683,11 +751,43 @@ const closeBonusesModal = () => {
   selectedParticipantIdForBonuses.value = null
 }
 
-const handleOpenAddCabinet = (participant) => {
-  preselectedParticipant.value = participant
-  viewParticipantModalOpen.value = false
-  addModalOpen.value = true
+const openDeleteModal = (item) => {
+  itemToDelete.value = item
+  deleteModalOpen.value = true
 }
+
+const confirmDelete = async () => {
+  if (!itemToDelete.value) return
+  
+  const cabinetId = itemToDelete.value.id
+  deleteModalOpen.value = false
+
+  try {
+    const token = localStorage.getItem('access_token')
+    
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${cabinetId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to delete participant')
+    }
+
+    // Refresh data
+    fetchParticipants(currentPage.value)
+  } catch (e) {
+    console.error('Error deleting participant:', e)
+    alert(`Ошибка при удалении участника: ${e.message}`)
+  } finally {
+    itemToDelete.value = null
+  }
+}
+
 
 onMounted(async () => {
   await Promise.all([

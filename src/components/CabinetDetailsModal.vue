@@ -7,10 +7,10 @@
     role="dialog"
     @click.self="handleClose"
   >
-    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Информация о кабинете</h5>
+          <h5 class="modal-title">Информация</h5>
           <button 
             type="button" 
             class="btn-close" 
@@ -19,45 +19,199 @@
           ></button>
         </div>
         <div class="modal-body">
-          <div v-if="loading" class="text-center py-4">
+          <div v-if="loading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Загрузка...</span>
             </div>
           </div>
 
           <div v-else-if="cabinetInfo">
-            <!-- Основная информация -->
-            <div class="row g-3 mb-4">
-              <div class="col-md-6">
-                <div class="card">
-                  <div class="card-body">
-                    <h6 class="card-title mb-3">Участник</h6>
-                    <p class="mb-1"><strong>ФИО:</strong> {{ formatFullName(cabinetInfo.participant) }}</p>
-                    <p class="mb-1"><strong>Номер кабинета:</strong> {{ cabinetInfo.sequence_number }}</p>
-                    <p class="mb-1"><strong>Персональный номер:</strong> {{ cabinetInfo.personal_number }}</p>
-                    <p class="mb-0"><strong>Код:</strong> {{ cabinetInfo.code }}</p>
-                    <hr class="my-2">
-                    <p class="mb-1"><strong>Спонсор:</strong> {{ cabinetInfo.sponsor ? formatFullName(cabinetInfo.sponsor.participant) : '-' }}</p>
-                    <p class="mb-1"><strong>Номер спонсора:</strong> {{ cabinetInfo.sponsor?.personal_number || '-' }}</p>
-                    <p class="mb-0"><strong>Кабинет спонсора:</strong> {{ cabinetInfo.sponsor?.sequence_number || '-' }}</p>
-                  </div>
+            <!-- Меню навигации -->
+            <div class="tabs-container mb-4">
+              <div class="tabs-segmented-control">
+                <div 
+                  class="tab-segment"
+                  :class="{ 'tab-segment-active': currentTab === 'participant' }"
+                  @click="currentTab = 'participant'"
+                >
+                  Участник
                 </div>
-              </div>
-              <div class="col-md-6">
-                <div class="card">
-                  <div class="card-body">
-                    <h6 class="card-title mb-3">Пакет и статус</h6>
-                    <p class="mb-1"><strong>Пакет:</strong> {{ cabinetInfo.paket?.name || '-' }}</p>
-                    <p class="mb-1"><strong>Цена пакета:</strong> {{ cabinetInfo.paket?.price || '-' }}</p>
-                    <p class="mb-1"><strong>Статус:</strong> {{ cabinetInfo.status?.name || '-' }}</p>
-                    <p class="mb-0"><strong>Филиал:</strong> {{ cabinetInfo.branch?.name || '-' }}</p>
-                  </div>
+                <div 
+                  class="tab-segment"
+                  :class="{ 'tab-segment-active': currentTab === 'to' }"
+                  @click="currentTab = 'to'"
+                >
+                  Товарооборот
+                </div>
+                <div 
+                  class="tab-segment"
+                  :class="{ 'tab-segment-active': currentTab === 'bonuses' }"
+                  @click="currentTab = 'bonuses'"
+                >
+                  Бонусы
+                </div>
+                <div 
+                  class="tab-segment"
+                  :class="{ 'tab-segment-active': currentTab === 'personal' }"
+                  @click="currentTab = 'personal'"
+                >
+                  Личники
+                </div>
+                <div 
+                  class="tab-segment"
+                  :class="{ 'tab-segment-active': currentTab === 'orders' }"
+                  @click="currentTab = 'orders'"
+                >
+                  Заказы
                 </div>
               </div>
             </div>
 
-            <!-- Обороты -->
-            <div class="mb-3">
+            <!-- Вкладка: Участник -->
+            <div v-show="currentTab === 'participant'">
+              <table class="simple-table">
+                <tbody>
+                  <tr>
+                    <td class="label-cell">Участник</td>
+                    <td>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span>{{ formatFullName(cabinetInfo.participant) }} ({{ cabinetInfo.personal_number }})</span>
+                        <button 
+                          class="btn btn-sm btn-outline-primary"
+                          @click="goToStructure(cabinetInfo.id)"
+                          title="Перейти к структуре"
+                        >
+                          <i class="bi bi-diagram-3 me-1"></i>
+                          Структура
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Спонсор</td>
+                    <td>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span>
+                          <span 
+                            v-if="cabinetInfo.sponsor"
+                            class="clickable-link"
+                            @click="handleNavigate(cabinetInfo.sponsor_id)"
+                          >
+                            {{ formatFullName(cabinetInfo.sponsor.participant) }} ({{ cabinetInfo.sponsor.personal_number }})
+                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                          </span>
+                          <span v-else>-</span>
+                        </span>
+                        <button 
+                          v-if="cabinetInfo.sponsor"
+                          class="btn btn-sm btn-outline-primary"
+                          @click="goToStructure(cabinetInfo.sponsor_id)"
+                          title="Перейти к структуре спонсора"
+                        >
+                          <i class="bi bi-diagram-3 me-1"></i>
+                          Структура
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Наставник</td>
+                    <td>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span>
+                          <span 
+                            v-if="cabinetInfo.mentor"
+                            class="clickable-link"
+                            @click="handleNavigate(cabinetInfo.mentor_id)"
+                          >
+                            {{ formatFullName(cabinetInfo.mentor.participant) }} ({{ cabinetInfo.mentor.personal_number }})
+                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                          </span>
+                          <span v-else>-</span>
+                        </span>
+                        <button 
+                          v-if="cabinetInfo.mentor"
+                          class="btn btn-sm btn-outline-primary"
+                          @click="goToStructure(cabinetInfo.mentor_id)"
+                          title="Перейти к структуре наставника"
+                        >
+                          <i class="bi bi-diagram-3 me-1"></i>
+                          Структура
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Пакет</td>
+                    <td>{{ cabinetInfo.paket?.name || '-' }} - {{ formatPrice(cabinetInfo.paket?.price) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Статус</td>
+                    <td>{{ cabinetInfo.status?.name || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Филиал</td>
+                    <td>{{ cabinetInfo.branch?.name || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Дата</td>
+                    <td>
+                      {{ cabinetInfo.registered ? formatDateTime(cabinetInfo.register_at) : formatDateTime(cabinetInfo.created_at) }}
+                      ({{ cabinetInfo.registered ? 'Зарегистрирован' : 'Не зарегистрирован' }})
+                    </td>
+                  </tr>
+                  
+                  <!-- Разделитель -->
+                  <tr class="separator-row">
+                    <td colspan="2"></td>
+                  </tr>
+                  
+                  <tr>
+                    <td class="label-cell">Email</td>
+                    <td>{{ cabinetInfo.participant?.email || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Телефон</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.phone_number || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Дата рождения</td>
+                    <td>{{ formatDate(cabinetInfo.participant?.passport_info?.date_birth) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Паспорт ID</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.passport_id || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">ПИН</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.pin || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Орган выдачи</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.passport_issuer || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Дата выдачи паспорта</td>
+                    <td>{{ formatDate(cabinetInfo.participant?.passport_info?.passport_issue_date) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Банк</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.bank || '-' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">ИП/ИНН</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.ip_inn ? 'Да' : 'Нет' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Пенсионер</td>
+                    <td>{{ cabinetInfo.participant?.passport_info?.pensioner ? 'Да' : 'Нет' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Вкладка: ТО (Товарооборот) -->
+            <div v-show="currentTab === 'to'">
               <h6 class="mb-3">Обороты</h6>
               
               <!-- Переключатель периода -->
@@ -95,8 +249,8 @@
 
               <div v-else-if="turnoverData">
                 <!-- Сводка -->
-                <div class="row g-3 mb-4">
-                  <div class="col-md-3">
+                <div class="row g-3">
+                  <div class="col-md-6">
                     <div class="card bg-light">
                       <div class="card-body text-center">
                         <div class="text-muted small mb-1">Левая ветка</div>
@@ -104,7 +258,7 @@
                       </div>
                     </div>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-6">
                     <div class="card bg-light">
                       <div class="card-body text-center">
                         <div class="text-muted small mb-1">Правая ветка</div>
@@ -112,23 +266,118 @@
                       </div>
                     </div>
                   </div>
-                  <div class="col-md-3">
-                    <div class="card bg-warning bg-opacity-10">
-                      <div class="card-body text-center">
-                        <div class="text-muted small mb-1">Слабая нога</div>
-                        <div class="fs-5 fw-bold text-warning">{{ turnoverData.summary.weak_leg }}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-3">
-                    <div class="card bg-success bg-opacity-10">
-                      <div class="card-body text-center">
-                        <div class="text-muted small mb-1">Всего</div>
-                        <div class="fs-5 fw-bold text-success">{{ turnoverData.summary.total_volume }}</div>
-                      </div>
-                    </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Вкладка: Бонусы -->
+            <div v-show="currentTab === 'bonuses'">
+              <!-- Bonus Tabs -->
+              <div class="mb-3 d-flex justify-content-center">
+                <div class="bonus-segmented-control">
+                  <button 
+                    type="button" 
+                    class="bonus-segment"
+                    :class="{ 'bonus-segment-active': activeBonusTab === 'binary' }"
+                    @click="activeBonusTab = 'binary'"
+                  >
+                    Бинарный
+                  </button>
+                  <button 
+                    type="button" 
+                    class="bonus-segment"
+                    :class="{ 'bonus-segment-active': activeBonusTab === 'matching' }"
+                    @click="activeBonusTab = 'matching'"
+                  >
+                    Чек от Чека
+                  </button>
+                  <button 
+                    type="button" 
+                    class="bonus-segment"
+                    :class="{ 'bonus-segment-active': activeBonusTab === 'referral' }"
+                    @click="activeBonusTab = 'referral'"
+                  >
+                    Реферальный
+                  </button>
+                  <button 
+                    type="button" 
+                    class="bonus-segment"
+                    :class="{ 'bonus-segment-active': activeBonusTab === 'status' }"
+                    @click="activeBonusTab = 'status'"
+                  >
+                    Статусный
+                  </button>
+                  <button 
+                    type="button" 
+                    class="bonus-segment"
+                    :class="{ 'bonus-segment-active': activeBonusTab === 'sponsor' }"
+                    @click="activeBonusTab = 'sponsor'"
+                  >
+                    Спонсорский
+                  </button>
+                </div>
+              </div>
+
+              <!-- Content Area -->
+              <div class="tab-content p-3 border rounded bg-light" style="min-height: 300px;">
+                <div v-if="bonusesLoading" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
                   </div>
                 </div>
+                
+                <div v-else>
+                  <div v-if="activeBonusTab === 'binary'">
+                    <BinaryBonuses 
+                      :cabinet-id="cabinetId"
+                      :is-active="activeBonusTab === 'binary'"
+                    />
+                  </div>
+
+                  <div v-if="activeBonusTab === 'matching'">
+                    <ChequeBonuses 
+                      :cabinet-id="cabinetId"
+                      :is-active="activeBonusTab === 'matching'"
+                    />
+                  </div>
+
+                  <div v-if="activeBonusTab === 'referral'">
+                    <ReferralBonuses 
+                      :cabinet-id="cabinetId"
+                      :is-active="activeBonusTab === 'referral'"
+                    />
+                  </div>
+
+                  <div v-if="activeBonusTab === 'status'">
+                    <StatusBonuses 
+                      :cabinet-id="cabinetId"
+                      :is-active="activeBonusTab === 'status'"
+                    />
+                  </div>
+
+                  <div v-if="activeBonusTab === 'sponsor'">
+                    <SponsorBonuses 
+                      :cabinet-id="cabinetId"
+                      :is-active="activeBonusTab === 'sponsor'"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Вкладка: Личники -->
+            <div v-show="currentTab === 'personal'">
+              <PersonalCabinets 
+                :sponsor-id="cabinetId"
+                :is-active="currentTab === 'personal'"
+              />
+            </div>
+
+            <!-- Вкладка: Заказы -->
+            <div v-show="currentTab === 'orders'">
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Раздел "Заказы" в разработке
               </div>
             </div>
           </div>
@@ -154,7 +403,14 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { BACKEND_API_URL } from '../config'
+import BinaryBonuses from './bonuses/BinaryBonuses.vue'
+import ChequeBonuses from './bonuses/ChequeBonuses.vue'
+import ReferralBonuses from './bonuses/ReferralBonuses.vue'
+import StatusBonuses from './bonuses/StatusBonuses.vue'
+import SponsorBonuses from './bonuses/SponsorBonuses.vue'
+import PersonalCabinets from './PersonalCabinets.vue'
 
 const props = defineProps({
   isOpen: {
@@ -164,20 +420,57 @@ const props = defineProps({
   cabinetId: {
     type: String,
     default: null
+  },
+  initialTab: {
+    type: String,
+    default: 'participant'
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'navigate'])
 
 const loading = ref(false)
 const turnoverLoading = ref(false)
+const bonusesLoading = ref(false)
 const cabinetInfo = ref(null)
 const turnoverData = ref(null)
 const selectedPeriod = ref('all')
+const currentTab = ref('participant')
+const activeBonusTab = ref('binary')
+
+const router = useRouter()
+
+const handleNavigate = (cabinetId) => {
+  if (cabinetId) {
+    emit('navigate', cabinetId)
+  }
+}
+
+const goToStructure = (cabinetId) => {
+  if (cabinetId) {
+    router.push({ name: 'structure', params: { cabinetId } })
+  }
+}
 
 const formatFullName = (participant) => {
   if (!participant) return '-'
   return `${participant.lastname || ''} ${participant.name || ''} ${participant.patronymic || ''}`.trim()
+}
+
+const formatPrice = (price) => {
+  if (!price) return '0.00'
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price
+  return numPrice.toFixed(2) + ' $'
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ru-RU')
+  } catch (err) {
+    return '-'
+  }
 }
 
 const formatDateTime = (dateString) => {
@@ -218,7 +511,7 @@ const loadCabinetInfo = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('access_token')
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/${props.cabinetId}`, {
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${props.cabinetId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'accept': 'application/json'
@@ -228,7 +521,11 @@ const loadCabinetInfo = async () => {
     if (!response.ok) throw new Error('Failed to load cabinet info')
     
     cabinetInfo.value = await response.json()
-    await loadTurnover()
+    
+    // Загружаем обороты только если открыта вкладка ТО
+    if (currentTab.value === 'to') {
+      await loadTurnover()
+    }
   } catch (error) {
     console.error('Error loading cabinet info:', error)
   } finally {
@@ -272,11 +569,32 @@ const handleClose = () => {
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal && props.cabinetId) {
+    currentTab.value = props.initialTab || 'participant'
     loadCabinetInfo()
   } else {
     cabinetInfo.value = null
     turnoverData.value = null
     selectedPeriod.value = 'all'
+    currentTab.value = 'participant'
+  }
+})
+
+watch(() => props.cabinetId, (newId, oldId) => {
+  if (newId && newId !== oldId && props.isOpen) {
+    currentTab.value = props.initialTab || 'participant'
+    loadCabinetInfo()
+  }
+})
+
+watch(() => props.initialTab, (newTab) => {
+  if (newTab && props.isOpen) {
+    currentTab.value = newTab
+  }
+})
+
+watch(() => currentTab.value, (newTab) => {
+  if (newTab === 'to' && !turnoverData.value && cabinetInfo.value) {
+    loadTurnover()
   }
 })
 </script>
@@ -290,7 +608,55 @@ watch(() => props.isOpen, (newVal) => {
   z-index: 1050;
 }
 
-/* Segmented Control */
+.modal-dialog {
+  max-height: 80vh;
+  height: 80vh;
+}
+
+.modal-content {
+  height: 100%;
+}
+
+/* Tabs - Navbar Style */
+.tabs-container {
+  display: flex;
+  justify-content: center;
+}
+
+.tabs-segmented-control {
+  display: inline-flex;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 0;
+}
+
+.tab-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  color: #6c757d;
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab-segment:hover:not(.tab-segment-active) {
+  color: rgb(0, 0, 128);
+}
+
+.tab-segment-active {
+  background-color: #ffffff !important;
+  color: rgb(0, 0, 128) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Segmented Control for Period */
 .segmented-control {
   display: inline-flex;
   background-color: #f8f9fa;
@@ -327,9 +693,77 @@ watch(() => props.isOpen, (newVal) => {
   color: #495057;
 }
 
-.sticky-top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* Simple Table Styles */
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
 }
+
+.simple-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.simple-table tr:last-child td {
+  border-bottom: none;
+}
+
+.label-cell {
+  font-weight: 600;
+  width: 30%;
+  color: #495057;
+}
+
+.separator-row td {
+  padding: 20px 0 !important;
+  border-bottom: 2px solid #dee2e6 !important;
+}
+
+
+/* Clickable Links */
+.clickable-link {
+  color: rgb(0, 0, 128);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.clickable-link:hover {
+  text-decoration: underline;
+  color: rgba(0, 0, 128, 0.8);
+}
+
+/* Bonus Segmented Control */
+.bonus-segmented-control {
+  display: flex;
+  background-color: #f1f3f5;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.bonus-segment {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.bonus-segment-active {
+  background-color: white;
+  color: rgb(0, 0, 128);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.bonus-segment:hover:not(.bonus-segment-active) {
+  color: rgb(0, 0, 128);
+}
+
+
+
 </style>

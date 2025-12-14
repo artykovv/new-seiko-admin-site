@@ -17,7 +17,9 @@ const isLoginPage = computed(() => {
 })
 
 const isPublicPage = computed(() => {
-  return route.path === '/login' || route.path === '/test/participant/register'
+  return route.path === '/login' || 
+         route.path === '/test/participant/register' ||
+         route.path.startsWith('/print/blank/')
 })
 </script>
 

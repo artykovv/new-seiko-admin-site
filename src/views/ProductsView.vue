@@ -253,88 +253,221 @@
     </FormModal>
 
     <!-- Модальное окно редактирования продукта -->
-    <FormModal
-      :is-open="editModalOpen"
-      title="Изменить продукт"
-      save-button-text="Сохранить"
-      @save="handleEditProduct"
-      @close="closeEditModal"
+    <div 
+      class="modal fade" 
+      :class="{ show: editModalOpen, 'd-block': editModalOpen }" 
+      :style="{ display: editModalOpen ? 'block' : 'none' }"
+      tabindex="-1"
+      role="dialog"
+      @click.self="closeEditModal"
     >
-      <template #body>
-        <form @submit.prevent="handleEditProduct" class="product-form">
-          <div class="mb-3">
-            <label for="edit_sku" class="form-label">SKU <span class="text-danger">*</span></label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="edit_sku" 
-              v-model="editFormData.sku"
-              placeholder="BAD-001"
-              required
-            />
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" role="document" style="height: 80vh;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Изменить продукт</h5>
+            <button 
+              type="button" 
+              class="btn-close" 
+              @click="closeEditModal"
+              aria-label="Close"
+            ></button>
           </div>
-          <div class="mb-3">
-            <label for="edit_name" class="form-label">Название <span class="text-danger">*</span></label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="edit_name" 
-              v-model="editFormData.name"
-              placeholder="Японский бад для иммунитета"
-              required
-            />
+          <div class="modal-body">
+            <!-- Navbar Tabs -->
+            <div class="mb-3 d-flex justify-content-center">
+              <div class="edit-product-tabs">
+                <button 
+                  type="button"
+                  class="edit-tab"
+                  :class="{ 'edit-tab-active': editActiveTab === 'info' }"
+                  @click="editActiveTab = 'info'"
+                >
+                  Информация
+                </button>
+                <button 
+                  type="button"
+                  class="edit-tab"
+                  :class="{ 'edit-tab-active': editActiveTab === 'images' }"
+                  @click="editActiveTab = 'images'"
+                >
+                  Изображение
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab: Information -->
+            <div v-show="editActiveTab === 'info'">
+              <form @submit.prevent="handleEditProduct" class="product-form">
+                <div class="mb-3">
+                  <label for="edit_sku" class="form-label">SKU <span class="text-danger">*</span></label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="edit_sku" 
+                    v-model="editFormData.sku"
+                    placeholder="BAD-001"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="edit_name" class="form-label">Название <span class="text-danger">*</span></label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="edit_name" 
+                    v-model="editFormData.name"
+                    placeholder="Японский бад для иммунитета"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="edit_description" class="form-label">Описание</label>
+                  <textarea 
+                    class="form-control" 
+                    id="edit_description" 
+                    v-model="editFormData.description"
+                    placeholder="Высококачественный японский бад для укрепления иммунной системы"
+                    rows="3"
+                  ></textarea>
+                </div>
+                <div class="mb-3">
+                  <label for="edit_price" class="form-label">Цена <span class="text-danger">*</span></label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="edit_price" 
+                    v-model.number="editFormData.price"
+                    placeholder="45.00"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="edit_cost_price" class="form-label">Себестоимость <span class="text-danger">*</span></label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="edit_cost_price" 
+                    v-model.number="editFormData.cost_price"
+                    placeholder="25.00"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="edit_stock" class="form-label">Остаток <span class="text-danger">*</span></label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="edit_stock" 
+                    v-model.number="editFormData.stock"
+                    placeholder="100"
+                    min="0"
+                    required
+                  />
+                </div>
+              </form>
+            </div>
+
+            <!-- Tab: Images -->
+            <div v-show="editActiveTab === 'images'">
+              <div v-if="imagesLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Загрузка...</span>
+                </div>
+              </div>
+
+              <div v-else>
+                <!-- Upload Section -->
+                <div class="mb-4">
+                  <label class="form-label fw-semibold">Загрузить изображение</label>
+                  <div class="d-flex gap-2">
+                    <input 
+                      type="file" 
+                      ref="imageFileInput"
+                      class="form-control" 
+                      accept="image/*"
+                      @change="handleImageFileSelect"
+                    />
+                    <button 
+                      class="btn btn-primary"
+                      style="background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128);"
+                      @click="handleUploadImage"
+                      :disabled="!selectedImageFile || uploadingImage"
+                    >
+                      <i class="bi bi-upload me-1"></i>
+                      {{ uploadingImage ? 'Загрузка...' : 'Загрузить' }}
+                    </button>
+                  </div>
+                  <div v-if="imageUploadError" class="alert alert-danger mt-2 mb-0">
+                    {{ imageUploadError }}
+                  </div>
+                </div>
+
+                <!-- Images Grid -->
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Изображения продукта</label>
+                  <div v-if="productImages.length === 0" class="text-center text-muted py-4">
+                    Нет изображений
+                  </div>
+                  <div v-else class="row g-3">
+                    <div 
+                      v-for="image in productImages" 
+                      :key="image.id"
+                      class="col-md-4"
+                    >
+                      <div class="card">
+                        <img 
+                          :src="image.src" 
+                          class="card-img-top" 
+                          style="height: 200px; object-fit: cover;"
+                          :alt="`Product image ${image.id}`"
+                        />
+                        <div class="card-body p-2">
+                          <button 
+                            class="btn btn-sm btn-danger w-100"
+                            @click="handleDeleteImage(image.id)"
+                            :disabled="deletingImageId === image.id"
+                          >
+                            <i class="bi bi-trash me-1"></i>
+                            {{ deletingImageId === image.id ? 'Удаление...' : 'Удалить' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="mb-3">
-            <label for="edit_description" class="form-label">Описание</label>
-            <textarea 
-              class="form-control" 
-              id="edit_description" 
-              v-model="editFormData.description"
-              placeholder="Высококачественный японский бад для укрепления иммунной системы"
-              rows="3"
-            ></textarea>
+          <div class="modal-footer">
+            <button 
+              type="button" 
+              class="btn btn-secondary" 
+              @click="closeEditModal"
+            >
+              Закрыть
+            </button>
+            <button 
+              v-if="editActiveTab === 'info'"
+              type="button" 
+              class="btn btn-primary"
+              style="background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128);"
+              @click="handleEditProduct"
+            >
+              Сохранить
+            </button>
           </div>
-          <div class="mb-3">
-            <label for="edit_price" class="form-label">Цена <span class="text-danger">*</span></label>
-            <input 
-              type="number" 
-              class="form-control" 
-              id="edit_price" 
-              v-model.number="editFormData.price"
-              placeholder="45.00"
-              step="0.01"
-              min="0"
-              required
-            />
-          </div>
-          <div class="mb-3">
-            <label for="edit_cost_price" class="form-label">Себестоимость <span class="text-danger">*</span></label>
-            <input 
-              type="number" 
-              class="form-control" 
-              id="edit_cost_price" 
-              v-model.number="editFormData.cost_price"
-              placeholder="25.00"
-              step="0.01"
-              min="0"
-              required
-            />
-          </div>
-          <div class="mb-3">
-            <label for="edit_stock" class="form-label">Остаток <span class="text-danger">*</span></label>
-            <input 
-              type="number" 
-              class="form-control" 
-              id="edit_stock" 
-              v-model.number="editFormData.stock"
-              placeholder="100"
-              min="0"
-              required
-            />
-          </div>
-        </form>
-      </template>
-    </FormModal>
+        </div>
+      </div>
+    </div>
+    <div 
+      v-if="editModalOpen" 
+      class="modal-backdrop fade show"
+      @click="closeEditModal"
+    ></div>
 
     <!-- Модальное окно подтверждения удаления -->
     <ConfirmModal
@@ -374,12 +507,10 @@
             <div v-else>
               <div class="row">
                 <div class="col-md-4 mb-3">
-                  <label class="form-label fw-semibold">Изображения</label>
-                  <div v-if="viewData.images && viewData.images.length > 0" class="d-flex flex-column gap-2">
+                  <label class="form-label fw-semibold">Изображение</label>
+                  <div v-if="viewData.images && viewData.images.length > 0">
                     <img 
-                      v-for="(image, index) in viewData.images" 
-                      :key="image.id || index"
-                      :src="image.src" 
+                      :src="viewData.images[0].src" 
                       :alt="viewData.name"
                       class="img-fluid rounded border"
                       style="max-height: 200px; object-fit: cover;"
@@ -661,6 +792,18 @@ const editFormData = ref({
   stock: 0
 })
 
+// Edit Modal Tab State
+const editActiveTab = ref('info')
+
+// Image Management State
+const productImages = ref([])
+const imagesLoading = ref(false)
+const selectedImageFile = ref(null)
+const imageFileInput = ref(null)
+const uploadingImage = ref(false)
+const imageUploadError = ref('')
+const deletingImageId = ref(null)
+
 const columns = [
   { key: 'image', label: 'Изображение' },
   { key: 'sku', label: 'SKU' },
@@ -902,9 +1045,10 @@ const closeViewModal = () => {
 }
 
 const openEditModalFromView = () => {
+  const productId = viewData.value.id
   closeViewModal()
-  if (viewData.value.id) {
-    openEditModal({ id: viewData.value.id })
+  if (productId) {
+    openEditModal({ id: productId })
   }
 }
 
@@ -931,11 +1075,16 @@ const openEditModal = async (item) => {
       id: product.id,
       sku: product.sku || '',
       name: product.name || '',
-      description: product.description || '',
+    description: product.description || '',
       price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
       cost_price: typeof product.cost_price === 'string' ? parseFloat(product.cost_price) : product.cost_price,
       stock: product.stock || 0
     }
+    
+    // Load images when opening edit modal
+    await loadProductImages(product.id)
+    
+    editActiveTab.value = 'info'
     editModalOpen.value = true
   } catch (err) {
     error.value = err.message || 'Ошибка при загрузке продукта'
@@ -953,6 +1102,119 @@ const closeEditModal = () => {
     price: 0,
     cost_price: 0,
     stock: 0
+  }
+  editActiveTab.value = 'info'
+  productImages.value = []
+  selectedImageFile.value = null
+  imageUploadError.value = ''
+  if (imageFileInput.value) {
+    imageFileInput.value.value = ''
+  }
+}
+
+// Image Management Functions
+const loadProductImages = async (productId) => {
+  imagesLoading.value = true
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${productId}/images`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to load images')
+    }
+
+    productImages.value = await response.json()
+  } catch (err) {
+    console.error('Error loading images:', err)
+    productImages.value = []
+  } finally {
+    imagesLoading.value = false
+  }
+}
+
+const handleImageFileSelect = (event) => {
+  const file = event.target.files?.[0]
+  selectedImageFile.value = file || null
+  imageUploadError.value = ''
+}
+
+const handleUploadImage = async () => {
+  if (!selectedImageFile.value || !editFormData.value.id) return
+
+  uploadingImage.value = true
+  imageUploadError.value = ''
+
+  try {
+    const token = localStorage.getItem('access_token')
+    const formData = new FormData()
+    formData.append('file', selectedImageFile.value)
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${editFormData.value.id}/upload-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image')
+    }
+
+    // Reload images after successful upload
+    await loadProductImages(editFormData.value.id)
+    
+    // Reset file input
+    selectedImageFile.value = null
+    if (imageFileInput.value) {
+      imageFileInput.value.value = ''
+    }
+    
+    // Refresh products list to update image in table
+    await fetchProducts()
+  } catch (err) {
+    console.error('Error uploading image:', err)
+    imageUploadError.value = 'Ошибка при загрузке изображения'
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+const handleDeleteImage = async (imageId) => {
+  if (!editFormData.value.id) return
+
+  deletingImageId.value = imageId
+
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${editFormData.value.id}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to delete image')
+    }
+
+    // Reload images after successful deletion
+    await loadProductImages(editFormData.value.id)
+    
+    // Refresh products list to update image in table
+    await fetchProducts()
+  } catch (err) {
+    console.error('Error deleting image:', err)
+    error.value = 'Ошибка при удалении изображения'
+  } finally {
+    deletingImageId.value = null
   }
 }
 
@@ -1364,5 +1626,47 @@ onBeforeUnmount(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Edit Product Tabs */
+.edit-product-tabs {
+  display: inline-flex;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 0;
+}
+
+.edit-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  color: #212529;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.edit-tab:hover {
+  color: rgb(0, 0, 128);
+  transition: color 0.2s ease;
+}
+
+.edit-tab-active {
+  background-color: #ffffff !important;
+  color: rgb(0, 0, 128) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transform: translateY(0);
+}
+
+.edit-tab-active:hover {
+  color: rgb(0, 0, 128) !important;
 }
 </style>

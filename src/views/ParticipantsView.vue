@@ -135,13 +135,7 @@
           class="h-100"
         >
           <template #cell-fullname="{ item }">
-            <span 
-              class="text-primary" 
-              style="cursor: pointer; text-decoration: underline;"
-              @click="openViewParticipantModal(item)"
-            >
-              {{ formatFullName(item) }}
-            </span>
+            <span>{{ formatFullName(item) }}</span>
           </template>
           <template #cell-personal_number="{ item }">
             <span 
@@ -189,19 +183,15 @@
       @error="handleAddError"
     />
 
-    <!-- Модальное окно просмотра участника -->
-    <ViewParticipantModal
-      :is-open="viewParticipantModalOpen"
-      :participant-id="selectedParticipantId"
-      @close="closeViewParticipantModal"
-      @openAddCabinet="handleOpenAddCabinet"
-    />
 
-    <!-- Модальное окно информации о кабинете -->
+
+    <!-- Модальное окно информации -->
     <CabinetDetailsModal
       :is-open="cabinetDetailsModalOpen"
       :cabinet-id="selectedCabinetId"
+      :initial-tab="initialTab"
       @close="closeCabinetDetailsModal"
+      @navigate="handleCabinetNavigate"
     />
 
     <!-- Модальное окно личников -->
@@ -215,18 +205,28 @@
     <EditParticipantModal
       :is-open="editModalOpen"
       :cabinet-id="selectedCabinetIdForEdit"
-      :participant-id="selectedParticipantIdForEdit"
       :branches="branches"
       :pakets="pakets"
       @close="closeEditModal"
       @success="handleEditSuccess"
+      @upgrade="handleOpenUpgrade"
+    />
+
+    <!-- Модальное окно Upgrade -->
+    <UpgradeModal
+      :is-open="upgradeModalOpen"
+      :cabinet-id="selectedCabinetIdForUpgrade"
+      :current-paket-id="currentPaketIdForUpgrade"
+      :pakets="pakets"
+      @close="closeUpgradeModal"
+      @back="handleBackToEdit"
+      @success="handleUpgradeSuccess"
     />
 
     <!-- Модальное окно бонусов -->
     <BonusesModal
       :is-open="bonusesModalOpen"
       :cabinet-id="selectedCabinetIdForBonuses"
-      :participant-id="selectedParticipantIdForBonuses"
       @close="closeBonusesModal"
     />
   </div>
@@ -237,10 +237,10 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from '../components/DataTable.vue'
 import AddParticipantModal from '../components/AddParticipantModal.vue'
-import ViewParticipantModal from '../components/ViewParticipantModal.vue'
 import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
 import PersonalCabinetsModal from '../components/PersonalCabinetsModal.vue'
 import EditParticipantModal from '../components/EditParticipantModal.vue'
+import UpgradeModal from '../components/UpgradeModal.vue'
 import BonusesModal from '../components/BonusesModal.vue'
 import { BACKEND_API_URL } from '../config'
 
@@ -265,13 +265,13 @@ const selectedStatusIds = ref([])
 const sortByRegisterAt = ref(null)
 
 const addModalOpen = ref(false)
-const viewParticipantModalOpen = ref(false)
-const selectedParticipantId = ref(null)
 const preselectedParticipant = ref(null)
 
 // Cabinet details modal
 const cabinetDetailsModalOpen = ref(false)
 const selectedCabinetId = ref(null)
+const initialTab = ref('participant')
+
 
 // Personal cabinets modal
 const personalCabinetsModalOpen = ref(false)
@@ -287,13 +287,17 @@ const bonusesModalOpen = ref(false)
 const selectedCabinetIdForBonuses = ref(null)
 const selectedParticipantIdForBonuses = ref(null)
 
+// Upgrade modal
+const upgradeModalOpen = ref(false)
+const selectedCabinetIdForUpgrade = ref(null)
+const currentPaketIdForUpgrade = ref(null)
+
 const columns = [
   { key: 'branch_name', label: 'Филиал' },
   { key: 'personal_number', label: 'Номер' },
   { key: 'fullname', label: 'ФИО' },
   { key: 'paket_name', label: 'Пакет' },
   { key: 'status_name', label: 'Статус' },
-  { key: 'sequence_number', label: 'Номер кабинета' },
   { key: 'register_at', label: 'Дата регистрации' }
 ]
 
@@ -301,17 +305,22 @@ const actions = [
   {
     label: 'Просмотр',
     icon: 'bi-eye',
-    handler: (item) => console.log('View', item)
+    handler: (item) => openCabinetDetailsModal(item.id, 'participant')
   },
   {
     label: 'Личники',
     icon: 'bi-people',
-    handler: (item) => openPersonalCabinetsModal(item.id)
+    handler: (item) => openCabinetDetailsModal(item.id, 'personal')
   },
   {
     label: 'Бонусы',
     icon: 'bi-cash-coin',
-    handler: (item) => openBonusesModal(item)
+    handler: (item) => openCabinetDetailsModal(item.id, 'bonuses')
+  },
+  {
+    label: 'Бланк',
+    icon: 'bi-file-earmark-text',
+    handler: (item) => openBlankForm(item)
   },
   {
     label: 'Структура',
@@ -601,24 +610,22 @@ const handleAddError = (errorMessage) => {
   error.value = errorMessage
 }
 
-const openViewParticipantModal = (item) => {
-  selectedParticipantId.value = item.participant_id
-  viewParticipantModalOpen.value = true
-}
 
-const closeViewParticipantModal = () => {
-  viewParticipantModalOpen.value = false
-  selectedParticipantId.value = null
-}
 
-const openCabinetDetailsModal = (cabinetId) => {
+const openCabinetDetailsModal = (cabinetId, tab = 'participant') => {
   selectedCabinetId.value = cabinetId
+  initialTab.value = tab
   cabinetDetailsModalOpen.value = true
 }
 
 const closeCabinetDetailsModal = () => {
   cabinetDetailsModalOpen.value = false
   selectedCabinetId.value = null
+  initialTab.value = 'participant'
+}
+
+const handleCabinetNavigate = (cabinetId) => {
+  selectedCabinetId.value = cabinetId
 }
 
 const openPersonalCabinetsModal = (sponsorId) => {
@@ -647,6 +654,29 @@ const handleEditSuccess = () => {
   fetchParticipants(currentPage.value)
 }
 
+const handleOpenUpgrade = (data) => {
+  selectedCabinetIdForUpgrade.value = data.cabinetId
+  currentPaketIdForUpgrade.value = data.currentPaketId
+  editModalOpen.value = false
+  upgradeModalOpen.value = true
+}
+
+const closeUpgradeModal = () => {
+  upgradeModalOpen.value = false
+  selectedCabinetIdForUpgrade.value = null
+  currentPaketIdForUpgrade.value = null
+}
+
+const handleBackToEdit = () => {
+  upgradeModalOpen.value = false
+  editModalOpen.value = true
+}
+
+const handleUpgradeSuccess = () => {
+  upgradeModalOpen.value = false
+  fetchParticipants(currentPage.value)
+}
+
 const openBonusesModal = (item) => {
   selectedCabinetIdForBonuses.value = item.id
   selectedParticipantIdForBonuses.value = item.participant_id
@@ -659,11 +689,21 @@ const closeBonusesModal = () => {
   selectedParticipantIdForBonuses.value = null
 }
 
-const handleOpenAddCabinet = (participant) => {
-  preselectedParticipant.value = participant
-  viewParticipantModalOpen.value = false
-  addModalOpen.value = true
+const openBlankForm = (item) => {
+  if (!item.id) return
+  const url = `/print/blank/${item.id}`
+  window.open(url, '_blank', 'width=800,height=1000')
 }
+
+const openUpgradeModal = (item) => {
+  if (!item.id || !item.paket_id) return
+  selectedCabinetIdForUpgrade.value = item.id
+  currentPaketIdForUpgrade.value = item.paket_id
+  upgradeModalOpen.value = true
+}
+
+
+
 
 onMounted(async () => {
   await Promise.all([

@@ -90,33 +90,21 @@
               <td>{{ formatDate(bonus.created_at) }}</td>
               <td>
                 <div v-if="bonus.from_cabinet">
-                  <div class="fw-semibold">{{ formatName(bonus.from_cabinet.participant) }}</div>
-                  <div class="small text-muted">
-                    {{ bonus.from_cabinet.personal_number }} 
-                    <span v-if="bonus.from_cabinet.sequence_number">
-                      (Каб. №{{ bonus.from_cabinet.sequence_number }})
-                    </span>
-                  </div>
+                  {{ formatName(bonus.from_cabinet.participant) }} ({{ bonus.from_cabinet.personal_number }})
                 </div>
                 <span v-else>-</span>
               </td>
               <td v-if="!cabinetId">
                 <div v-if="bonus.cabinet">
-                  <div class="fw-semibold">{{ formatName(bonus.cabinet.participant) }}</div>
-                  <div class="small text-muted">
-                    {{ bonus.cabinet.personal_number }}
-                    <span v-if="bonus.cabinet.sequence_number">
-                      (Каб. №{{ bonus.cabinet.sequence_number }})
-                    </span>
-                  </div>
+                  {{ formatName(bonus.cabinet.participant) }} ({{ bonus.cabinet.personal_number }})
                 </div>
                 <span v-else>-</span>
               </td>
-              <td class="fw-bold text-success">
+              <td>
                 {{ formatPrice(bonus.bonus_amount) }}
               </td>
               <td>
-                <span class="badge" :class="bonus.issued ? 'bg-success' : 'bg-warning text-dark'">
+                <span class="badge" :class="bonus.issued ? 'bg-success' : 'bg-warning'">
                   {{ bonus.issued ? 'Выплачен' : 'Ожидает' }}
                 </span>
               </td>
@@ -348,12 +336,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.table th {
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-.table td {
-  font-size: 0.9rem;
-}
-</style>
+

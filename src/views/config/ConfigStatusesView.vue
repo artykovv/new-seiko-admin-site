@@ -136,7 +136,21 @@
             :items="filteredItems"
             :actions="actions"
             class="h-100"
-          />
+          >
+            <template #cell-is_active="{ item }">
+              <div class="form-check form-switch">
+                <input 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  role="switch" 
+                  :id="`switch-${item.id}`"
+                  :checked="item.is_active"
+                  @change="toggleActive(item)"
+                  style="cursor: pointer;"
+                >
+              </div>
+            </template>
+          </DataTable>
         </div>
 
         <!-- Pagination -->
@@ -401,6 +415,20 @@
                 </label>
               </div>
             </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  role="switch" 
+                  id="is_active"
+                  v-model="formData.is_active"
+                >
+                <label class="form-check-label" for="is_active">
+                  Активен
+                </label>
+              </div>
+            </div>
           </div>
         </form>
       </template>
@@ -583,7 +611,8 @@ const formData = ref({
   required_personal_status_id: null,
   required_personal_count_left: 0,
   required_personal_count_right: 0,
-  require_in_either_branch: false
+  require_in_either_branch: false,
+  is_active: true
 })
 const editingId = ref(null)
 
@@ -681,11 +710,11 @@ const saveOrder = async () => {
 
 const columns = [
   { key: 'rank', label: 'Ранг' },
-  { key: 'id', label: 'ID' },
   { key: 'name', label: 'Название' },
   { key: 'required_turnover', label: 'Требуемый оборот' },
   { key: 'bonus_percentage', label: 'Процент бонуса' },
-  { key: 'sponsor_bonus', label: 'Спонсорский бонус' }
+  { key: 'sponsor_bonus', label: 'Спонсорский бонус' },
+  { key: 'is_active', label: 'Активен' }
 ]
 
 const actions = [
@@ -832,7 +861,8 @@ const openAddModal = () => {
     required_personal_status_id: null,
     required_personal_count_left: 0,
     required_personal_count_right: 0,
-    require_in_either_branch: false
+    require_in_either_branch: false,
+    is_active: true
   }
   editingId.value = null
   formMode.value = 'basic'
@@ -918,7 +948,8 @@ const openEditModal = async (item) => {
       required_personal_status_id: data.required_personal_status_id ?? null,
       required_personal_count_left: data.required_personal_count_left ?? 0,
       required_personal_count_right: data.required_personal_count_right ?? 0,
-      require_in_either_branch: data.require_in_either_branch ?? false
+      require_in_either_branch: data.require_in_either_branch ?? false,
+      is_active: data.is_active !== undefined ? data.is_active : true
     }
     formMode.value = 'basic'
     formModalOpen.value = true
@@ -944,7 +975,8 @@ const closeFormModal = () => {
     required_personal_status_id: null,
     required_personal_count_left: 0,
     required_personal_count_right: 0,
-    require_in_either_branch: false
+    require_in_either_branch: false,
+    is_active: true
   }
   editingId.value = null
 }
@@ -970,7 +1002,8 @@ const handleSave = async () => {
       required_personal_status_id: formData.value.required_personal_status_id ?? null,
       required_personal_count_left: formData.value.required_personal_count_left ?? 0,
       required_personal_count_right: formData.value.required_personal_count_right ?? 0,
-      require_in_either_branch: formData.value.require_in_either_branch ?? false
+      require_in_either_branch: formData.value.require_in_either_branch ?? false,
+      is_active: formData.value.is_active
     }
 
     const url = editingId.value 
@@ -1038,6 +1071,39 @@ const handleDelete = async () => {
   } catch (err) {
     error.value = err.message || 'Ошибка при удалении статуса'
     console.error('Error deleting status:', err)
+  }
+}
+
+const toggleActive = async (item) => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('Токен авторизации не найден')
+    }
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/statuses/${item.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify({
+        is_active: !item.is_active
+      })
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
+      }
+      throw new Error(`Ошибка обновления статуса: ${response.status}`)
+    }
+
+    await fetchStatuses()
+  } catch (err) {
+    error.value = err.message || 'Ошибка при изменении статуса'
+    console.error('Error toggling status active state:', err)
   }
 }
 

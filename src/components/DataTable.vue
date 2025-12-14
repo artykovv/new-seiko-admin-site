@@ -34,14 +34,15 @@
               <td v-if="hasActions" class="px-3 py-2 text-end border-bottom-0 position-relative">
                 <div class="dropdown">
                   <button 
-                    class="btn btn-link text-muted p-0 action-btn" 
+                    class="btn btn-link text-muted px-2 py-1 action-btn" 
                     type="button" 
                     data-bs-toggle="dropdown" 
                     data-bs-boundary="viewport"
                     data-bs-popper-config='{"strategy":"fixed"}'
                     aria-expanded="false"
+                    style="min-width: 32px;"
                   >
-                    <i class="bi bi-three-dots-vertical" style="font-size: 1rem;"></i>
+                    <i class="bi bi-three-dots-vertical" style="font-size: 1.1rem;"></i>
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm rounded-3 mt-1">
                     <li v-for="(action, aIndex) in actions" :key="aIndex">
