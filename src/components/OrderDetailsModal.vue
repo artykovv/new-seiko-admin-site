@@ -51,7 +51,16 @@
                 <div class="col-md-6">
                   <div class="status-card">
                     <div class="status-card-label">Статус заказа</div>
-                    <div class="status-card-value">{{ orderData.status?.description || orderData.status?.name || '-' }}</div>
+                    <select 
+                      class="form-select form-select-sm status-select"
+                      v-model.number="editableStatusId"
+                      @change="updateOrderStatus"
+                      :disabled="updatingStatus"
+                    >
+                      <option v-for="status in orderStatuses" :key="status.id" :value="status.id">
+                        {{ status.description || status.name }}
+                      </option>
+                    </select>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -63,7 +72,16 @@
                 <div class="col-md-6">
                   <div class="status-card">
                     <div class="status-card-label">Статус оплаты</div>
-                    <div class="status-card-value">{{ orderData.payment_status?.name || '-' }}</div>
+                    <select 
+                      class="form-select form-select-sm status-select"
+                      v-model.number="editablePaymentStatusId"
+                      @change="updateOrderStatus"
+                      :disabled="updatingStatus"
+                    >
+                      <option v-for="status in paymentStatuses" :key="status.id" :value="status.id">
+                        {{ status.name }}
+                      </option>
+                    </select>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -266,6 +284,11 @@ const emit = defineEmits(['close', 'updated'])
 
 const loading = ref(false)
 const orderData = ref(null)
+const orderStatuses = ref([])
+const paymentStatuses = ref([])
+const editableStatusId = ref(0)
+const editablePaymentStatusId = ref(0)
+const updatingStatus = ref(false)
 
 // Fulfill dialog state
 const fulfillDialogOpen = ref(false)
@@ -343,10 +366,70 @@ const loadOrderData = async () => {
     }
     
     orderData.value = await response.json()
+    editableStatusId.value = orderData.value.status?.id || 0
+    editablePaymentStatusId.value = orderData.value.payment_status?.id || 0
   } catch (err) {
     console.error('Error fetching order:', err)
   } finally {
     loading.value = false
+  }
+}
+
+const loadStatuses = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) return
+
+    const [statusesRes, paymentStatusesRes] = await Promise.all([
+      fetch(`${BACKEND_API_URL}/api/admin/orders/statuses/`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'accept': 'application/json' }
+      }),
+      fetch(`${BACKEND_API_URL}/api/admin/orders/payment-statuses/`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'accept': 'application/json' }
+      })
+    ])
+
+    if (statusesRes.ok) orderStatuses.value = await statusesRes.json()
+    if (paymentStatusesRes.ok) paymentStatuses.value = await paymentStatusesRes.json()
+  } catch (err) {
+    console.error('Error loading statuses:', err)
+  }
+}
+
+const updateOrderStatus = async () => {
+  if (!orderData.value) return
+  
+  updatingStatus.value = true
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) throw new Error('Токен авторизации не найден')
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/orders/${orderData.value.id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify({
+        status_id: editableStatusId.value,
+        payment_status_id: editablePaymentStatusId.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('Ошибка обновления статуса')
+    }
+
+    await loadOrderData()
+    emit('updated')
+  } catch (err) {
+    console.error('Error updating status:', err)
+    // Revert changes
+    editableStatusId.value = orderData.value.status?.id || 0
+    editablePaymentStatusId.value = orderData.value.payment_status?.id || 0
+  } finally {
+    updatingStatus.value = false
   }
 }
 
@@ -420,6 +503,9 @@ const handleClose = () => {
 watch(() => props.isOpen, (newVal) => {
   if (newVal && props.orderId) {
     loadOrderData()
+    if (orderStatuses.value.length === 0) {
+      loadStatuses()
+    }
   } else {
     orderData.value = null
   }
@@ -498,6 +584,24 @@ watch(() => props.orderId, (newId, oldId) => {
 .status-card-value {
   font-size: 0.95rem;
   color: #212529;
+}
+
+.status-select {
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+  transition: border-color 0.15s ease-in-out;
+}
+
+.status-select:focus {
+  border-color: rgb(0, 0, 128);
+  box-shadow: 0 0 0 0.2rem rgba(0, 0, 128, 0.25);
+}
+
+.status-select:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
 }
 
 .products-section {
