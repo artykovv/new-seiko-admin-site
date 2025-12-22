@@ -1193,7 +1193,7 @@ const handleDeleteImage = async (imageId) => {
 
   try {
     const token = localStorage.getItem('access_token')
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/${editFormData.value.id}/images/${imageId}`, {
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/products/images/${imageId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,

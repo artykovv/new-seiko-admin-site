@@ -56,6 +56,21 @@
             <div class="col-md-6">
               <h6 class="mb-3">Доступные позиции</h6>
               
+              <!-- Info alert for auto-selected mentor -->
+              <div v-if="autoSelectedMentor" class="alert alert-success alert-sm mb-3 d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="bi bi-info-circle me-2"></i>
+                  <small>Этот наставник был выбран участником при регистрации</small>
+                </div>
+                <button 
+                  type="button" 
+                  class="btn btn-sm btn-outline-success"
+                  @click="clearAutoSelection"
+                >
+                  <i class="bi bi-arrow-repeat me-1"></i>Изменить
+                </button>
+              </div>
+              
               <!-- Поиск -->
               <div class="mb-3">
                 <input 
@@ -64,6 +79,7 @@
                   v-model="positionSearchQuery"
                   @input="filterPositions"
                   placeholder="Поиск по ФИО или номеру..."
+                  :disabled="autoSelectedMentor"
                 />
               </div>
 
@@ -125,10 +141,23 @@
                 <div class="mb-3">
                   <div 
                     class="card mentor-card"
-                    :class="{ 'animate-bump': animateMentor }"
+                    :class="{ 'animate-bump': animateMentor, 'border-success': autoSelectedMentor }"
                   >
                     <div class="card-body p-3 bg-light position-relative">
-                      <div class="text-muted small mb-1">НАСТАВНИК</div>
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="text-muted small">НАСТАВНИК</div>
+                        <span 
+                          v-if="autoSelectedMentor" 
+                          class="badge bg-success d-flex align-items-center gap-1"
+                          style="cursor: pointer;"
+                          @click="clearAutoSelection"
+                          title="Нажмите, чтобы выбрать другого наставника"
+                        >
+                          <i class="bi bi-check-circle"></i>
+                          <span>Автовыбор</span>
+                          <i class="bi bi-x-lg" style="font-size: 0.75rem;"></i>
+                        </span>
+                      </div>
                       
                       <div v-if="selectedPosition">
                         <div class="fw-semibold">{{ formatFullName(selectedPosition) }}</div>
@@ -136,6 +165,7 @@
                         
                         <!-- Кнопка сброса выбора -->
                         <button 
+                          v-if="!autoSelectedMentor"
                           type="button"
                           class="btn-close position-absolute"
                           style="top: 12px; right: 12px;"
@@ -274,12 +304,15 @@ const emit = defineEmits(['close', 'success', 'error'])
 const loading = ref(false)
 const participantInfo = ref({})
 const sponsorInfo = ref(null)
+const mentorInfo = ref(null)
+const mentorStructure = ref(null)
 const availablePositions = ref([])
 const filteredPositions = ref([])
 const positionSearchQuery = ref('')
 const selectedPosition = ref(null)
 const side = ref('')
 const adding = ref(false)
+const autoSelectedMentor = ref(false)
 
 const animateMentor = ref(false)
 const animateLeft = ref(false)
@@ -379,6 +412,20 @@ const clearSelectedPosition = () => {
   })
 }
 
+// Clear auto-selection and load all available positions
+const clearAutoSelection = async () => {
+  if (!participantInfo.value?.sponsor_id) return
+  
+  autoSelectedMentor.value = false
+  selectedPosition.value = null
+  side.value = ''
+  mentorInfo.value = null
+  mentorStructure.value = null
+  
+  // Load all available positions from sponsor
+  await loadAvailablePositions(participantInfo.value.sponsor_id)
+}
+
 const onLeftClick = () => {
   if (!selectedPosition.value) return
   if (!leftIsFree.value && !isLeftPreviewParticipant.value) return
@@ -421,7 +468,14 @@ const loadParticipantInfo = async () => {
     
     if (data.sponsor_id) {
       await loadSponsorInfo(data.sponsor_id)
-      await loadAvailablePositions(data.sponsor_id)
+      
+      // Check if participant has a mentor_id
+      if (data.mentor_id) {
+        await checkMentorAvailability(data.mentor_id, data.sponsor_id)
+      } else {
+        // No mentor selected, load all available positions
+        await loadAvailablePositions(data.sponsor_id)
+      }
     }
   } catch (error) {
     console.error('Error loading participant info:', error)
@@ -446,6 +500,88 @@ const loadSponsorInfo = async (sponsorId) => {
     }
   } catch (error) {
     console.error('Error loading sponsor info:', error)
+  }
+}
+
+// Check mentor availability and auto-select if possible
+const checkMentorAvailability = async (mentorId, sponsorId) => {
+  try {
+    const token = localStorage.getItem('access_token')
+    
+    // Load mentor info
+    const mentorResponse = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/${mentorId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    
+    if (mentorResponse.ok) {
+      mentorInfo.value = await mentorResponse.json()
+    }
+    
+    // Load mentor structure to check availability
+    const structureResponse = await fetch(`${BACKEND_API_URL}/api/admin/structure/${mentorId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    
+    if (!structureResponse.ok) {
+      // If structure not found, fall back to find_free_positions
+      await loadAvailablePositions(sponsorId)
+      return
+    }
+    
+    const structureData = await structureResponse.json()
+    mentorStructure.value = structureData
+    
+    // Check which sides are free
+    const leftFree = !structureData.left_child
+    const rightFree = !structureData.right_child
+    
+    if (leftFree || rightFree) {
+      // Mentor has at least one free position - auto-select
+      const position = leftFree && rightFree ? 'both' : (leftFree ? 'left' : 'right')
+      
+      // Create a position object from mentor info
+      const mentorPosition = {
+        id: mentorId,
+        name: mentorInfo.value?.participant?.name || '',
+        lastname: mentorInfo.value?.participant?.lastname || '',
+        patronymic: mentorInfo.value?.participant?.patronymic || '',
+        personal_number: mentorInfo.value?.personal_number || '',
+        code: mentorInfo.value?.code || '',
+        position: position
+      }
+      
+      // Auto-select this mentor
+      availablePositions.value = [mentorPosition]
+      filteredPositions.value = [mentorPosition]
+      selectedPosition.value = mentorPosition
+      autoSelectedMentor.value = true
+      
+      // Auto-select side if only one is available
+      if (position === 'left') {
+        side.value = 'left'
+      } else if (position === 'right') {
+        side.value = 'right'
+      }
+      
+      // Trigger animation
+      animateMentor.value = false
+      requestAnimationFrame(() => {
+        animateMentor.value = true
+      })
+    } else {
+      // Both sides are occupied - fall back to find_free_positions
+      await loadAvailablePositions(sponsorId)
+    }
+  } catch (error) {
+    console.error('Error checking mentor availability:', error)
+    // Fall back to find_free_positions on error
+    await loadAvailablePositions(sponsorId)
   }
 }
 
@@ -513,8 +649,11 @@ const handleClose = () => {
   positionSearchQuery.value = ''
   participantInfo.value = {}
   sponsorInfo.value = null
+  mentorInfo.value = null
+  mentorStructure.value = null
   availablePositions.value = []
   filteredPositions.value = []
+  autoSelectedMentor.value = false
   emit('close')
 }
 
@@ -560,4 +699,11 @@ watch(() => props.isOpen, (newValue) => {
 .animate-bump {
   animation: bump 220ms ease-in-out;
 }
+
+.badge.bg-success[style*="cursor: pointer"]:hover {
+  background-color: #157347 !important;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
 </style>

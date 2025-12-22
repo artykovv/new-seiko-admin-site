@@ -1,16 +1,19 @@
 <template>
   <div 
     class="modal fade" 
+    id="cabinetDetailsModal"
     :class="{ show: isOpen, 'd-block': isOpen }" 
     :style="{ display: isOpen ? 'block' : 'none' }"
     tabindex="-1"
     role="dialog"
+    aria-hidden="true"
+    aria-labelledby="cabinetDetailsModalLabel"
     @click.self="handleClose"
   >
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Информация</h5>
+          <h5 class="modal-title" id="cabinetDetailsModalLabel">Информация</h5>
           <button 
             type="button" 
             class="btn-close" 
@@ -375,14 +378,47 @@
 
             <!-- Вкладка: Заказы -->
             <div v-show="currentTab === 'orders'">
-              <div class="alert alert-info">
+              <div v-if="ordersLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Загрузка...</span>
+                </div>
+              </div>
+
+              <div v-else-if="orders.length > 0">
+                <DataTable
+                  :columns="ordersColumns"
+                  :items="orders"
+                  :actions="ordersActions"
+                >
+                  <template #cell-fulfillment_status="{ item }">
+                    <div class="d-flex align-items-center gap-2">
+                      <span 
+                        class="status-indicator" 
+                        :class="getFulfillmentStatusClass(item.fulfillment_status?.name)"
+                      ></span>
+                      <span>{{ item.fulfillment_status?.name || '-' }}</span>
+                    </div>
+                  </template>
+                </DataTable>
+              </div>
+
+              <div v-else class="alert alert-info">
                 <i class="bi bi-info-circle me-2"></i>
-                Раздел "Заказы" в разработке
+                Заказы не найдены
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
+          <button 
+            v-if="canDelete"
+            type="button" 
+            class="btn btn-danger me-auto" 
+            @click="openDeleteConfirmation"
+          >
+            <i class="bi bi-trash me-1"></i>
+            Удалить
+          </button>
           <button 
             type="button" 
             class="btn btn-secondary" 
@@ -399,6 +435,61 @@
     class="modal-backdrop fade show"
     @click="handleClose"
   ></div>
+
+  <!-- Delete Confirmation Modal -->
+  <div 
+    class="modal fade" 
+    :class="{ show: deleteConfirmationOpen, 'd-block': deleteConfirmationOpen }" 
+    :style="{ display: deleteConfirmationOpen ? 'block' : 'none' }"
+    tabindex="-1"
+    role="dialog"
+    @click.self="closeDeleteConfirmation"
+  >
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Подтверждение удаления</h5>
+          <button type="button" class="btn-close btn-close-white" @click="closeDeleteConfirmation"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Внимание!</strong> Это действие необратимо.
+          </div>
+          <p class="mb-2"><strong>Вы действительно хотите удалить участника?</strong></p>
+          <div v-if="cabinetInfo" class="mt-3">
+            <div class="mb-2">
+              <strong>ФИО:</strong> {{ formatFullName(cabinetInfo.participant) }}
+            </div>
+            <div class="mb-2">
+              <strong>Персональный номер:</strong> {{ cabinetInfo.personal_number }}
+            </div>
+            <div class="mb-2">
+              <strong>Пакет:</strong> {{ cabinetInfo.paket?.name || '-' }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="closeDeleteConfirmation">Отмена</button>
+          <button type="button" class="btn btn-danger" @click="confirmDelete" :disabled="deleteLoading">
+            <span v-if="deleteLoading" class="spinner-border spinner-border-sm me-1"></span>
+            Удалить
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="deleteConfirmationOpen" class="modal-backdrop fade show"></div>
+
+  <!-- Order Details Modal -->
+  <OrderDetailsModal
+    :is-open="orderDetailsModalOpen"
+    :order-id="selectedOrderId"
+    modal-id="orderDetailsModalFromCabinet"
+    parent-modal-id="cabinetDetailsModal"
+    @close="closeOrderDetailsModal"
+    @updated="loadOrders"
+  />
 </template>
 
 <script setup>
@@ -411,6 +502,8 @@ import ReferralBonuses from './bonuses/ReferralBonuses.vue'
 import StatusBonuses from './bonuses/StatusBonuses.vue'
 import SponsorBonuses from './bonuses/SponsorBonuses.vue'
 import PersonalCabinets from './PersonalCabinets.vue'
+import DataTable from './DataTable.vue'
+import OrderDetailsModal from './OrderDetailsModal.vue'
 
 const props = defineProps({
   isOpen: {
@@ -427,7 +520,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'navigate'])
+const emit = defineEmits(['close', 'navigate', 'reopen'])
 
 const loading = ref(false)
 const turnoverLoading = ref(false)
@@ -437,6 +530,10 @@ const turnoverData = ref(null)
 const selectedPeriod = ref('all')
 const currentTab = ref('participant')
 const activeBonusTab = ref('binary')
+const ordersLoading = ref(false)
+const orders = ref([])
+const orderDetailsModalOpen = ref(false)
+const selectedOrderId = ref(null)
 
 const router = useRouter()
 
@@ -526,6 +623,9 @@ const loadCabinetInfo = async () => {
     if (currentTab.value === 'to') {
       await loadTurnover()
     }
+
+    // Check if cabinet can be deleted
+    await checkIfCanDelete()
   } catch (error) {
     console.error('Error loading cabinet info:', error)
   } finally {
@@ -563,6 +663,182 @@ const loadTurnover = async () => {
   }
 }
 
+// Orders columns and actions
+const ordersColumns = [
+  { key: 'id', label: '#' },
+  { key: 'total_amount', label: 'Сумма' },
+  { key: 'status', label: 'Статус заказа' },
+  { key: 'payment_method', label: 'Способ оплаты' },
+  { key: 'payment_status', label: 'Статус оплаты' },
+  { key: 'fulfillment_status', label: 'Статус выдачи' },
+  { key: 'order_date', label: 'Дата заказа' }
+]
+
+const ordersActions = [
+  {
+    label: 'Просмотр',
+    icon: 'bi-eye',
+    handler: (item) => {
+      openOrderDetailsModal(item.id)
+    }
+  }
+]
+
+const loadOrders = async () => {
+  if (!props.cabinetId) return
+  
+  ordersLoading.value = true
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/orders/?cabinet_id=${props.cabinetId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    
+    if (!response.ok) throw new Error('Failed to load orders')
+    
+    const data = await response.json()
+    const ordersArray = Array.isArray(data) ? data : (data.orders || data.items || [])
+    
+    orders.value = ordersArray.map(order => ({
+      id: order.id,
+      total_amount: formatCurrency(order.total_amount),
+      status: order.status?.description || order.status?.name || '-',
+      payment_method: order.payment_method?.name || '-',
+      payment_status: order.payment_status?.name || '-',
+      fulfillment_status: order.fulfillment_status,
+      order_date: formatDateTime(order.order_date || order.created_at)
+    }))
+  } catch (error) {
+    console.error('Error loading orders:', error)
+    orders.value = []
+  } finally {
+    ordersLoading.value = false
+  }
+}
+
+const getFulfillmentStatusClass = (statusName) => {
+  if (!statusName) return 'status-unknown'
+  
+  const normalizedStatus = statusName.toLowerCase().trim()
+  
+  if (normalizedStatus === 'выдано') {
+    return 'status-issued'
+  } else if (normalizedStatus === 'частично выдано') {
+    return 'status-partial'
+  } else if (normalizedStatus === 'не выдано') {
+    return 'status-not-issued'
+  }
+  
+  return 'status-unknown'
+}
+
+const formatCurrency = (amount) => {
+  if (!amount) return '0.00 $'
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
+  return numAmount.toFixed(2) + ' $'
+}
+
+const openOrderDetailsModal = (orderId) => {
+  selectedOrderId.value = orderId
+  // Temporarily hide the cabinet modal to prevent backdrop stacking
+  emit('close')
+  // Open order details modal after a short delay
+  setTimeout(() => {
+    orderDetailsModalOpen.value = true
+  }, 150)
+}
+
+const closeOrderDetailsModal = () => {
+  orderDetailsModalOpen.value = false
+  selectedOrderId.value = null
+  // Reopen cabinet modal after closing order details
+  setTimeout(() => {
+    emit('reopen')
+  }, 150)
+}
+
+// Delete functionality
+const deleteConfirmationOpen = ref(false)
+const deleteLoading = ref(false)
+const structureData = ref(null)
+const canDelete = ref(false)
+
+const checkIfCanDelete = async () => {
+  if (!props.cabinetId) {
+    canDelete.value = false
+    return
+  }
+
+  try {
+    const token = localStorage.getItem('access_token')
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/structure/${props.cabinetId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      canDelete.value = false
+      return
+    }
+
+    const data = await response.json()
+    structureData.value = data
+
+    // Can delete only if both left_child and right_child are null
+    canDelete.value = data.left_child === null && data.right_child === null
+  } catch (err) {
+    console.error('Error checking structure:', err)
+    canDelete.value = false
+  }
+}
+
+const openDeleteConfirmation = () => {
+  deleteConfirmationOpen.value = true
+}
+
+const closeDeleteConfirmation = () => {
+  deleteConfirmationOpen.value = false
+}
+
+const confirmDelete = async () => {
+  if (!props.cabinetId) return
+
+  deleteLoading.value = true
+  try {
+    const token = localStorage.getItem('access_token')
+    
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${props.cabinetId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || 'Failed to delete cabinet')
+    }
+
+    // Close modals and emit close event
+    closeDeleteConfirmation()
+    emit('close')
+    
+    // Optionally show success message or refresh parent view
+    // You might want to emit a 'deleted' event here
+  } catch (err) {
+    console.error('Error deleting cabinet:', err)
+    alert(`Ошибка при удалении участника: ${err.message}`)
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
 const handleClose = () => {
   emit('close')
 }
@@ -595,6 +871,9 @@ watch(() => props.initialTab, (newTab) => {
 watch(() => currentTab.value, (newTab) => {
   if (newTab === 'to' && !turnoverData.value && cabinetInfo.value) {
     loadTurnover()
+  }
+  if (newTab === 'orders' && cabinetInfo.value) {
+    loadOrders()
   }
 })
 </script>
@@ -764,6 +1043,33 @@ watch(() => currentTab.value, (newTab) => {
   color: rgb(0, 0, 128);
 }
 
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
+.status-issued {
+  background-color: #28a745; /* Зеленый - Выдано */
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-partial {
+  background-color: #ffc107; /* Желтый - Частично выдано */
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.status-not-issued {
+  background-color: #dc3545; /* Красный - Не выдано */
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-unknown {
+  background-color: #6c757d; /* Серый - Неизвестно */
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
 
 </style>

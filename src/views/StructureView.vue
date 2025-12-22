@@ -81,6 +81,8 @@
       :is-open="cabinetDetailsModalOpen"
       :cabinet-id="selectedCabinetId"
       @close="closeCabinetDetailsModal"
+      @navigate="handleCabinetNavigate"
+      @reopen="reopenCabinetDetailsModal"
     />
   </div>
 </template>
@@ -228,6 +230,14 @@ const handleCabinetDetailsClick = (cabinetId) => {
 const closeCabinetDetailsModal = () => {
   cabinetDetailsModalOpen.value = false
   selectedCabinetId.value = null
+}
+
+const handleCabinetNavigate = (cabinetId) => {
+  selectedCabinetId.value = cabinetId
+}
+
+const reopenCabinetDetailsModal = () => {
+  cabinetDetailsModalOpen.value = true
 }
 
 // Загрузка справочников

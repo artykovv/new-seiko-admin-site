@@ -286,32 +286,20 @@
 
           <div class="mb-3">
             <label for="edit_paket" class="form-label">Пакет</label>
-            <div class="d-flex gap-2">
-              <select 
-                class="form-select" 
-                id="edit_paket" 
-                v-model.number="formData.cabinet.paket_id"
-                :disabled="isRegistered"
-              >
-                <option :value="null">Выберите пакет</option>
-                <option v-for="paket in pakets" :key="paket.id" :value="paket.id">
-                  {{ paket.name }} - {{ formatPrice(paket.price) }}
-                </option>
-              </select>
-              <button 
-                v-if="isRegistered"
-                type="button"
-                class="btn btn-primary"
-                style="background-color: rgb(0, 0, 128); border-color: rgb(0, 0, 128); white-space: nowrap;"
-                @click="handleUpgrade"
-              >
-                <i class="bi bi-arrow-up-circle me-1"></i>
-                Upgrade
-              </button>
-            </div>
-            <small v-if="isRegistered" class="form-text text-warning">
+            <select 
+              class="form-select" 
+              id="edit_paket" 
+              v-model.number="formData.cabinet.paket_id"
+              disabled
+            >
+              <option :value="null">Выберите пакет</option>
+              <option v-for="paket in pakets" :key="paket.id" :value="paket.id">
+                {{ paket.name }} - {{ formatPrice(paket.price) }}
+              </option>
+            </select>
+            <small class="form-text text-muted">
               <i class="bi bi-info-circle me-1"></i>
-              Пакет нельзя изменить для зарегистрированных пользователей. Используйте кнопку Upgrade.
+              Пакет можно изменить только на клиентском сайте
             </small>
           </div>
 
@@ -403,7 +391,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success', 'upgrade'])
+const emit = defineEmits(['close', 'success'])
 
 const currentStep = ref(1)
 const loading = ref(false)
@@ -601,12 +589,7 @@ const selectSponsor = (cabinet) => {
   showSponsorDropdown.value = false
 }
 
-const handleUpgrade = () => {
-  emit('upgrade', {
-    cabinetId: props.cabinetId,
-    currentPaketId: formData.value.cabinet.paket_id
-  })
-}
+
 
 const handleClose = () => {
   currentStep.value = 1

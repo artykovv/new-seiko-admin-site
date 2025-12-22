@@ -23,9 +23,80 @@
           >
             <i class="bi bi-funnel"></i>
             Фильтры
+            <span v-if="hasActiveFilters" class="badge bg-primary rounded-pill" style="font-size: 0.7rem;">
+              {{ activeFiltersCount }}
+            </span>
           </button>
-          <ul class="dropdown-menu dropdown-menu-end p-3" style="min-width: 250px;">
-            <li class="text-muted small">Фильтры будут добавлены позже</li>
+          <ul class="dropdown-menu dropdown-menu-end p-3" style="min-width: 350px; max-width: 500px;">
+            <li class="mb-3">
+              <label class="form-label small mb-2">Статус заказа</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="status in orderStatuses" 
+                  :key="status.id"
+                  class="badge"
+                  :class="selectedStatusIds.includes(status.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="toggleStatus(status.id)"
+                >
+                  {{ status.description || status.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2">Способ оплаты</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="method in paymentMethods" 
+                  :key="method.id"
+                  class="badge"
+                  :class="selectedPaymentMethodIds.includes(method.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="togglePaymentMethod(method.id)"
+                >
+                  {{ method.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2">Статус оплаты</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="status in paymentStatuses" 
+                  :key="status.id"
+                  class="badge"
+                  :class="selectedPaymentStatusIds.includes(status.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.4rem 0.6rem;"
+                  @click="togglePaymentStatus(status.id)"
+                >
+                  {{ status.name }}
+                </span>
+              </div>
+            </li>
+            <li class="mb-3">
+              <label class="form-label small mb-2">Статус выдачи</label>
+              <div class="d-flex flex-wrap gap-2">
+                <span 
+                  v-for="status in fulfillmentStatuses" 
+                  :key="status.id"
+                  class="badge"
+                  :class="selectedFulfillmentStatusIds.includes(status.id) ? 'bg-primary' : 'bg-secondary'"
+                  style="cursor: pointer; font-size: 0.85rem; padding: 0.6rem 0.6rem;"
+                  @click="toggleFulfillmentStatus(status.id)"
+                >
+                  {{ status.name }}
+                </span>
+              </div>
+            </li>
+            <li>
+              <button 
+                v-if="hasActiveFilters" 
+                class="btn btn-sm btn-outline-danger w-100" 
+                @click="clearFilters"
+              >
+                Сбросить фильтры
+              </button>
+            </li>
           </ul>
         </div>
         
@@ -70,7 +141,17 @@
           :items="items"
           :actions="actions"
           class="h-100"
-        />
+        >
+          <template #cell-fulfillment_status="{ item }">
+            <span 
+              v-if="item.fulfillment_status"
+              class="status-indicator" 
+              :class="getFulfillmentStatusClass(item.fulfillment_status)"
+              :title="item.fulfillment_status"
+            ></span>
+            <span v-else>-</span>
+          </template>
+        </DataTable>
       </div>
 
       <!-- Pagination -->
@@ -436,176 +517,15 @@
     ></div>
 
     <!-- Модальное окно просмотра заказа -->
-    <div 
-      class="modal fade" 
-      :class="{ show: viewModalOpen, 'd-block': viewModalOpen }" 
-      :style="{ display: viewModalOpen ? 'block' : 'none' }"
-      tabindex="-1"
-      role="dialog"
-      @click.self="closeViewModal"
-    >
-      <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Просмотр заказа #{{ viewOrderData?.id }}</h5>
-            <button 
-              type="button" 
-              class="btn-close" 
-              @click="closeViewModal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <div v-if="loadingOrder" class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Загрузка...</span>
-              </div>
-            </div>
-            <div v-else-if="viewOrderData" class="order-view">
-              <!-- Информация о заказе -->
-              <div class="mb-4">
-                <h6 class="mb-3 border-bottom pb-2">Информация о заказе</h6>
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="text-muted small">ID заказа</label>
-                    <div class="fw-semibold">#{{ viewOrderData.id }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Общая сумма</label>
-                    <div class="fw-semibold text-primary">{{ formatCurrency(viewOrderData.total_amount) }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Дата заказа</label>
-                    <div>{{ formatDate(viewOrderData.order_date) }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Дата доставки</label>
-                    <div>{{ formatDate(viewOrderData.delivery_date) || '-' }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Статус</label>
-                    <div>
-                      <span class="badge bg-secondary">{{ viewOrderData.status?.description || viewOrderData.status?.name || '-' }}</span>
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Способ доставки</label>
-                    <div>{{ viewOrderData.delivery_method?.description || viewOrderData.delivery_method?.name || '-' }}</div>
-                  </div>
-                  <div class="col-12" v-if="viewOrderData.shipping_address">
-                    <label class="text-muted small">Адрес доставки</label>
-                    <div>{{ viewOrderData.shipping_address }}</div>
-                  </div>
-                  <div class="col-12" v-if="viewOrderData.notes">
-                    <label class="text-muted small">Примечания</label>
-                    <div>{{ viewOrderData.notes }}</div>
-                  </div>
-                </div>
-              </div>
+    <OrderDetailsModal
+      :is-open="viewModalOpen"
+      :order-id="selectedOrderId"
+      modal-id="orderDetailsModal"
+      @close="closeViewModal"
+      @updated="fetchOrders"
+    />
 
-              <!-- Информация об участнике -->
-              <div class="mb-4">
-                <h6 class="mb-3 border-bottom pb-2">Участник</h6>
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="text-muted small">ФИО</label>
-                    <div class="fw-semibold">{{ formatParticipantFullName(viewOrderData.participant) }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Email</label>
-                    <div>{{ viewOrderData.participant?.email || '-' }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Код</label>
-                    <div>{{ viewOrderData.participant?.code || '-' }}</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="text-muted small">Персональный номер</label>
-                    <div>{{ viewOrderData.participant?.personal_number || '-' }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Товары в заказе -->
-              <div class="mb-4">
-                <h6 class="mb-3 border-bottom pb-2">Товары ({{ viewOrderData.items?.length || 0 }})</h6>
-                <div v-if="viewOrderData.items && viewOrderData.items.length > 0" class="order-items-list">
-                  <div 
-                    v-for="(item, index) in viewOrderData.items" 
-                    :key="index"
-                    class="order-item-card"
-                  >
-                    <div class="d-flex align-items-start gap-3">
-                      <div class="order-item-image">
-                        <img 
-                          v-if="item.product?.images && item.product.images.length > 0" 
-                          :src="item.product.images[0].src" 
-                          :alt="item.product?.name"
-                          class="order-item-img"
-                        />
-                        <div v-else class="order-item-placeholder">
-                          <i class="bi bi-image"></i>
-                        </div>
-                      </div>
-                      <div class="flex-grow-1">
-                        <div class="fw-semibold mb-1">{{ item.product?.name || '-' }}</div>
-                        <div class="text-muted small mb-2">{{ item.product?.description || item.product?.sku || '-' }}</div>
-                        <div class="d-flex justify-content-between align-items-center">
-                          <div>
-                            <span class="text-muted small">Количество: </span>
-                            <span class="fw-semibold">{{ item.quantity }}</span>
-                          </div>
-                          <div>
-                            <span class="text-muted small">Цена за шт.: </span>
-                            <span class="fw-semibold">{{ formatCurrency(item.unit_price) }}</span>
-                          </div>
-                          <div>
-                            <span class="text-muted small">Итого: </span>
-                            <span class="fw-semibold text-primary">{{ formatCurrency(item.total_price) }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="text-muted text-center py-3">
-                  Товары не найдены
-                </div>
-              </div>
-
-              <!-- Дополнительная информация -->
-              <div class="mb-4">
-                <h6 class="mb-3 border-bottom pb-2">Дополнительная информация</h6>
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="text-muted small">Создан</label>
-                    <div>{{ formatDate(viewOrderData.created_at) }}</div>
-                  </div>
-                  <div class="col-md-6" v-if="viewOrderData.updated_at">
-                    <label class="text-muted small">Обновлен</label>
-                    <div>{{ formatDate(viewOrderData.updated_at) }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button 
-              type="button" 
-              class="btn btn-secondary" 
-              @click="closeViewModal"
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div 
-      v-if="viewModalOpen" 
-      class="modal-backdrop fade show"
-      @click="closeViewModal"
-    ></div>
+    <!-- Модальное окно выдачи товара - теперь внутри OrderDetailsModal -->
   </div>
 </template>
 
@@ -613,6 +533,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import DataTable from '../components/DataTable.vue'
 import FormModal from '../components/FormModal.vue'
+import OrderDetailsModal from '../components/OrderDetailsModal.vue'
 import { BACKEND_API_URL } from '../config'
 
 const items = ref([])
@@ -622,6 +543,19 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
+
+// Filter data
+const orderStatuses = ref([])
+const paymentMethods = ref([])
+const paymentStatuses = ref([])
+const fulfillmentStatuses = ref([])
+const deliveryMethods = ref([])
+
+// Selected filters
+const selectedStatusIds = ref([])
+const selectedPaymentMethodIds = ref([])
+const selectedPaymentStatusIds = ref([])
+const selectedFulfillmentStatusIds = ref([])
 
 const addModalOpen = ref(false)
 const currentOrderStep = ref(1)
@@ -653,19 +587,18 @@ const showCabinetDropdown = ref(false)
 const allProducts = ref([])
 const loadingProducts = ref(false)
 
-const orderStatuses = ref([])
-const deliveryMethods = ref([])
 
 let cabinetSearchTimeout = null
 
 const columns = [
-  { key: 'id', label: 'ID' },
+  { key: 'id', label: '#' },
   { key: 'cabinet_info', label: 'Кабинет' },
   { key: 'total_amount', label: 'Сумма' },
-  { key: 'status', label: 'Статус' },
-  { key: 'delivery_method', label: 'Способ доставки' },
-  { key: 'order_date', label: 'Дата заказа' },
-  { key: 'created_at', label: 'Создан' }
+  { key: 'status', label: 'Статус заказа' },
+  { key: 'payment_method', label: 'Способ оплаты' },
+  { key: 'payment_status', label: 'Статус оплаты' },
+  { key: 'fulfillment_status', label: 'Статус выдачи' },
+  { key: 'order_date', label: 'Дата заказа' }
 ]
 
 const actions = [
@@ -693,6 +626,22 @@ const formatCurrency = (amount) => {
     return `$${numAmount}`
   }
   return `$${numAmount.toFixed(2)}`
+}
+
+const getFulfillmentStatusClass = (statusName) => {
+  if (!statusName) return 'status-unknown'
+  
+  const status = statusName.toLowerCase()
+  
+  if (status === 'выдано' || status === 'issued') {
+    return 'status-issued' // Зеленый круг
+  } else if (status === 'частично выдано' || status === 'partially issued' || status.includes('частично')) {
+    return 'status-partial' // Желтый круг
+  } else if (status === 'не выдано' || status === 'not issued') {
+    return 'status-not-issued' // Красный круг
+  }
+  
+  return 'status-unknown' // Серый круг по умолчанию
 }
 
 const handleCabinetSearch = () => {
@@ -861,22 +810,7 @@ const fetchOrderStatuses = async () => {
   }
 }
 
-const fetchDeliveryMethods = async () => {
-  try {
-    const token = localStorage.getItem('access_token')
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/orders/delivery-methods`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      }
-    })
-    if (response.ok) {
-      deliveryMethods.value = await response.json()
-    }
-  } catch (err) {
-    console.error('Error fetching delivery methods:', err)
-  }
-}
+
 
 const openAddModal = () => {
   currentOrderStep.value = 1
@@ -1023,7 +957,6 @@ watch(() => addModalOpen.value, (newValue) => {
       document.addEventListener('click', handleClickOutside)
     }, 100)
     fetchOrderStatuses()
-    fetchDeliveryMethods()
   } else {
     document.removeEventListener('click', handleClickOutside)
   }
@@ -1066,6 +999,142 @@ const displayedPages = computed(() => {
   return rangeWithDots
 })
 
+// Fetch filter data
+const fetchFilterData = async () => {
+  const token = localStorage.getItem('access_token')
+  if (!token) return
+
+  try {
+    // Fetch order statuses
+    const statusesResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/statuses/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (statusesResponse.ok) {
+      orderStatuses.value = await statusesResponse.json()
+    }
+
+    // Fetch payment methods
+    const methodsResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/payment-methods/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (methodsResponse.ok) {
+      paymentMethods.value = await methodsResponse.json()
+    }
+
+    // Fetch payment statuses
+    const paymentStatusesResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/payment-statuses/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (paymentStatusesResponse.ok) {
+      paymentStatuses.value = await paymentStatusesResponse.json()
+    }
+
+    // Fetch fulfillment statuses
+    const fulfillmentStatusesResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/fulfillment-statuses/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (fulfillmentStatusesResponse.ok) {
+      fulfillmentStatuses.value = await fulfillmentStatusesResponse.json()
+    }
+
+    // Fetch delivery methods
+    const deliveryMethodsResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/delivery-methods/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+    if (deliveryMethodsResponse.ok) {
+      deliveryMethods.value = await deliveryMethodsResponse.json()
+    }
+  } catch (err) {
+    console.error('Error fetching filter data:', err)
+  }
+}
+
+// Toggle functions
+const toggleStatus = (statusId) => {
+  const index = selectedStatusIds.value.indexOf(statusId)
+  if (index > -1) {
+    selectedStatusIds.value.splice(index, 1)
+  } else {
+    selectedStatusIds.value.push(statusId)
+  }
+  applyFilters()
+}
+
+const togglePaymentMethod = (methodId) => {
+  const index = selectedPaymentMethodIds.value.indexOf(methodId)
+  if (index > -1) {
+    selectedPaymentMethodIds.value.splice(index, 1)
+  } else {
+    selectedPaymentMethodIds.value.push(methodId)
+  }
+  applyFilters()
+}
+
+const togglePaymentStatus = (statusId) => {
+  const index = selectedPaymentStatusIds.value.indexOf(statusId)
+  if (index > -1) {
+    selectedPaymentStatusIds.value.splice(index, 1)
+  } else {
+    selectedPaymentStatusIds.value.push(statusId)
+  }
+  applyFilters()
+}
+
+const toggleFulfillmentStatus = (statusId) => {
+  const index = selectedFulfillmentStatusIds.value.indexOf(statusId)
+  if (index > -1) {
+    selectedFulfillmentStatusIds.value.splice(index, 1)
+  } else {
+    selectedFulfillmentStatusIds.value.push(statusId)
+  }
+  applyFilters()
+}
+
+// Active filters
+const hasActiveFilters = computed(() => {
+  return selectedStatusIds.value.length > 0 || 
+         selectedPaymentMethodIds.value.length > 0 || 
+         selectedPaymentStatusIds.value.length > 0 ||
+         selectedFulfillmentStatusIds.value.length > 0
+})
+
+const activeFiltersCount = computed(() => {
+  let count = 0
+  if (selectedStatusIds.value.length > 0) count++
+  if (selectedPaymentMethodIds.value.length > 0) count++
+  if (selectedPaymentStatusIds.value.length > 0) count++
+  if (selectedFulfillmentStatusIds.value.length > 0) count++
+  return count
+})
+
+const clearFilters = () => {
+  selectedStatusIds.value = []
+  selectedPaymentMethodIds.value = []
+  selectedPaymentStatusIds.value = []
+  selectedFulfillmentStatusIds.value = []
+  fetchOrders()
+}
+
+const applyFilters = () => {
+  currentPage.value = 1
+  fetchOrders()
+}
+
 const fetchOrders = async () => {
   loading.value = true
   error.value = ''
@@ -1084,6 +1153,23 @@ const fetchOrders = async () => {
       params.append('search', searchQuery.value.trim())
     }
     
+    // Add filter parameters
+    selectedStatusIds.value.forEach(id => {
+      params.append('status_id', id.toString())
+    })
+    
+    selectedPaymentMethodIds.value.forEach(id => {
+      params.append('payment_method_id', id.toString())
+    })
+    
+    selectedPaymentStatusIds.value.forEach(id => {
+      params.append('payment_status_id', id.toString())
+    })
+    
+    selectedFulfillmentStatusIds.value.forEach(id => {
+      params.append('fulfillment_status_id', id.toString())
+    })
+    
     const response = await fetch(`${BACKEND_API_URL}/api/admin/orders/?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1100,13 +1186,19 @@ const fetchOrders = async () => {
     
     const data = await response.json()
     
+    // API возвращает массив заказов напрямую
+    const ordersArray = Array.isArray(data) ? data : (data.orders || data.items || [])
+    
     // Форматируем данные для таблицы
-    items.value = data.map(order => ({
+    items.value = ordersArray.map(order => ({
       id: order.id,
       cabinet_info: formatCabinetInfo(order.cabinet),
       total_amount: formatCurrency(order.total_amount),
       status: order.status?.description || order.status?.name || '-',
       status_name: order.status?.name || '-',
+      payment_method: order.payment_method?.name || order.payment_method?.description || '-',
+      payment_status: order.payment_status?.name || order.payment_status?.description || '-',
+      fulfillment_status: order.fulfillment_status?.name || order.fulfillment_status?.description || null,
       delivery_method: order.delivery_method?.description || order.delivery_method?.name || '-',
       order_date: formatDate(order.order_date),
       delivery_date: formatDate(order.delivery_date),
@@ -1120,6 +1212,7 @@ const fetchOrders = async () => {
     if (data.total_pages !== undefined) {
       totalPages.value = data.total_pages
     } else {
+      // Если пагинации нет, показываем все на одной странице
       totalPages.value = 1
     }
   } catch (err) {
@@ -1166,46 +1259,18 @@ const formatDate = (dateString) => {
 }
 
 const viewModalOpen = ref(false)
-const viewOrderData = ref(null)
-const loadingOrder = ref(false)
+const selectedOrderId = ref(null)
 
 const handleViewOrder = async (item) => {
-  loadingOrder.value = true
+  selectedOrderId.value = item.id
   viewModalOpen.value = true
-  try {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      throw new Error('Токен авторизации не найден')
-    }
-    
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/orders/${item.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Ошибка авторизации. Пожалуйста, войдите снова.')
-      }
-      throw new Error(`Ошибка загрузки: ${response.status}`)
-    }
-    
-    viewOrderData.value = await response.json()
-  } catch (err) {
-    error.value = err.message || 'Ошибка при загрузке заказа'
-    console.error('Error fetching order:', err)
-    viewModalOpen.value = false
-  } finally {
-    loadingOrder.value = false
-  }
 }
 
 const closeViewModal = () => {
   viewModalOpen.value = false
-  viewOrderData.value = null
+  selectedOrderId.value = null
 }
+
 
 const handleEditOrder = (item) => {
   console.log('Edit order:', item)
@@ -1226,7 +1291,8 @@ watch(searchQuery, () => {
   fetchOrders()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchFilterData()
   fetchOrders()
 })
 </script>
@@ -1534,6 +1600,96 @@ onMounted(() => {
 
 .step-panel {
   min-height: 300px;
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-issued {
+  background-color: #28a745; /* Зеленый - Выдано */
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-partial {
+  background-color: #ffc107; /* Желтый - Частично выдано */
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.status-not-issued {
+  background-color: #dc3545; /* Красный - Не выдано */
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-unknown {
+  background-color: #6c757d; /* Серый - Неизвестно */
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
+
+/* Redesigned Order View */
+.order-view-redesign {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.order-header-info {
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.status-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  height: 100%;
+}
+
+.status-card-label {
+  font-size: 0.75rem;
+  color: #999;
+  margin-bottom: 0.5rem;
+}
+
+.status-card-value {
+  font-size: 0.95rem;
+  color: #212529;
+}
+
+.products-section {
+  margin-top: 1.5rem;
+}
+
+.product-thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #adb5bd;
+  font-size: 1.5rem;
 }
 </style>
 

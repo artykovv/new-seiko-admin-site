@@ -61,8 +61,8 @@
         <a href="#" class="sidebar-menu-item d-flex align-items-center text-decoration-none px-2 py-2 rounded">
           <i class="bi bi-person-fill" style="font-size: 1.1rem; min-width: 24px; text-align: center;"></i>
           <span class="sidebar-menu-text ms-2" :class="{ 'sidebar-menu-text-visible': isOpen || isMobile }">
-            <div class="fw-semibold small mb-0">Администратор</div>
-            <div class="text-muted" style="font-size: 0.75rem;">admin@example.com</div>
+            <div class="fw-semibold small mb-0">{{ adminFullName }}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">{{ adminEmail }}</div>
           </span>
         </a>
       </div>
@@ -93,6 +93,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSidebar } from '../composables/useSidebar'
+import { BACKEND_API_URL } from '../config'
 
 const router = useRouter()
 const route = useRoute()
@@ -100,6 +101,36 @@ const { isOpen, toggle } = useSidebar()
 const windowWidth = ref(window.innerWidth)
 
 const isMobile = computed(() => windowWidth.value < 768)
+
+// Admin data
+const adminData = ref(null)
+const adminFullName = computed(() => {
+  if (!adminData.value) return 'Администратор'
+  const { lastname, name, patronymic } = adminData.value
+  return [lastname, name, patronymic].filter(Boolean).join(' ') || 'Администратор'
+})
+const adminEmail = computed(() => adminData.value?.email || 'admin@example.com')
+
+// Load admin data
+const loadAdminData = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (!token) return
+
+    const response = await fetch(`${BACKEND_API_URL}/api/admin/me`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/json'
+      }
+    })
+
+    if (response.ok) {
+      adminData.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Error loading admin data:', err)
+  }
+}
 
 // Получаем маршруты из router
 const menuItems = computed(() => {
@@ -128,6 +159,7 @@ const handleResize = () => {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+  loadAdminData()
 })
 
 onUnmounted(() => {

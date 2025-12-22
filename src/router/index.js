@@ -263,6 +263,16 @@ const routes = [
       requiresAuth: true
     },
     component: () => import('../views/PrintBlankView.vue')
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    meta: {
+      title: 'Страница не найдена',
+      hideInSidebar: true,
+      public: true
+    },
+    component: () => import('../views/NotFound.vue')
   }
 ]
 

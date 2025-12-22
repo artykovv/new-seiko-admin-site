@@ -1,0 +1,30 @@
+<style scoped>
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-issued {
+  background-color: #28a745; /* Зеленый - Выдано */
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-partial {
+  background-color: #ffc107; /* Желтый - Частично выдано */
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.status-not-issued {
+  background-color: #dc3545; /* Красный - Не выдано */
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-unknown {
+  background-color: #6c757d; /* Серый - Неизвестно */
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
+</style>

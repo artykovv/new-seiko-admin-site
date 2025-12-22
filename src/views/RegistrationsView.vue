@@ -147,6 +147,15 @@
               {{ item.personal_number }}
             </span>
           </template>
+          <template #cell-fulfillment_status="{ item }">
+            <span 
+              v-if="item.fulfillment_status"
+              class="status-indicator" 
+              :class="getFulfillmentStatusClass(item.fulfillment_status)"
+              :title="item.fulfillment_status"
+            ></span>
+            <span v-else>-</span>
+          </template>
           <template #cell-created_at="{ value }">
             {{ formatDate(value) }}
           </template>
@@ -202,6 +211,7 @@
       :initial-tab="initialTab"
       @close="closeCabinetDetailsModal"
       @navigate="handleCabinetNavigate"
+      @reopen="reopenCabinetDetailsModal"
     />
 
     <!-- Модальное окно личников -->
@@ -219,19 +229,9 @@
       :pakets="pakets"
       @close="closeEditModal"
       @success="handleEditSuccess"
-      @upgrade="handleOpenUpgrade"
     />
 
-    <!-- Модальное окно Upgrade -->
-    <UpgradeModal
-      :is-open="upgradeModalOpen"
-      :cabinet-id="selectedCabinetIdForUpgrade"
-      :current-paket-id="currentPaketIdForUpgrade"
-      :pakets="pakets"
-      @close="closeUpgradeModal"
-      @back="handleBackToEdit"
-      @success="handleUpgradeSuccess"
-    />
+
 
     <!-- Модальное окно бонусов -->
     <BonusesModal
@@ -240,45 +240,9 @@
       @close="closeBonusesModal"
     />
 
-    <!-- Delete Confirmation Modal -->
-    <div 
-      class="modal fade" 
-      :class="{ show: deleteModalOpen, 'd-block': deleteModalOpen }" 
-      :style="{ display: deleteModalOpen ? 'block' : 'none' }"
-      tabindex="-1"
-    >
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title">Подтверждение удаления</h5>
-            <button type="button" class="btn-close btn-close-white" @click="deleteModalOpen = false"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              <strong>Внимание!</strong> Это действие необратимо.
-            </div>
-            <p class="mb-2"><strong>Вы действительно хотите удалить участника?</strong></p>
-            <div v-if="itemToDelete" class="mt-3">
-              <div class="mb-2">
-                <strong>ФИО:</strong> {{ formatFullName(itemToDelete) }}
-              </div>
-              <div class="mb-2">
-                <strong>Персональный номер:</strong> {{ itemToDelete.personal_number }}
-              </div>
-              <div class="mb-2">
-                <strong>Пакет:</strong> {{ itemToDelete.paket?.name || '-' }}
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="deleteModalOpen = false">Отмена</button>
-            <button type="button" class="btn btn-danger" @click="confirmDelete">Удалить</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="deleteModalOpen" class="modal-backdrop fade show"></div>
+
+
+
   </div>
 </template>
 
@@ -290,7 +254,7 @@ import AddToStructureModal from '../components/AddToStructureModal.vue'
 import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
 import PersonalCabinetsModal from '../components/PersonalCabinetsModal.vue'
 import EditParticipantModal from '../components/EditParticipantModal.vue'
-import UpgradeModal from '../components/UpgradeModal.vue'
+
 import BonusesModal from '../components/BonusesModal.vue'
 import { BACKEND_API_URL } from '../config'
 
@@ -336,14 +300,6 @@ const bonusesModalOpen = ref(false)
 const selectedCabinetIdForBonuses = ref(null)
 const selectedParticipantIdForBonuses = ref(null)
 
-// Upgrade modal
-const upgradeModalOpen = ref(false)
-const selectedCabinetIdForUpgrade = ref(null)
-const currentPaketIdForUpgrade = ref(null)
-
-// Delete modal
-const deleteModalOpen = ref(false)
-const itemToDelete = ref(null)
 
 const columns = [
   { key: 'branch_name', label: 'Филиал' },
@@ -351,6 +307,7 @@ const columns = [
   { key: 'fullname', label: 'ФИО' },
   { key: 'paket_name', label: 'Пакет' },
   { key: 'status_name', label: 'Статус' },
+  { key: 'fulfillment_status', label: 'Статус выдачи' },
   { key: 'created_at', label: 'Дата создания' }
 ]
 
@@ -371,15 +328,14 @@ const actions = [
     handler: (item) => openCabinetDetailsModal(item.id, 'bonuses')
   },
   {
+    label: 'Бланк',
+    icon: 'bi-file-earmark-text',
+    handler: (item) => openBlankForm(item)
+  },
+  {
     label: 'Изменить',
     icon: 'bi-pencil',
     handler: (item) => openEditModal(item)
-  },
-  {
-    label: 'Удалить',
-    icon: 'bi-trash',
-    class: 'text-danger',
-    handler: (item) => openDeleteModal(item)
   }
 ]
 
@@ -397,6 +353,22 @@ const formatDate = (dateString) => {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${year}.${month}.${day} ${hours}:${minutes}`
+}
+
+const getFulfillmentStatusClass = (statusName) => {
+  if (!statusName) return 'status-unknown'
+  
+  const status = statusName.toLowerCase()
+  
+  if (status === 'выдано' || status === 'issued') {
+    return 'status-issued' // Зеленый круг
+  } else if (status === 'частично выдано' || status === 'partially issued' || status.includes('частично')) {
+    return 'status-partial' // Желтый круг
+  } else if (status === 'не выдано' || status === 'not issued') {
+    return 'status-not-issued' // Красный круг
+  }
+  
+  return 'status-unknown' // Серый круг по умолчанию
 }
 
 const fetchBranches = async () => {
@@ -506,7 +478,8 @@ const fetchParticipants = async (page = 1) => {
       branch_id: c.branch_id || null,
       paket_name: c.paket?.name || '-',
       status_name: c.status?.name || '-',
-      fullname: c.participant ? `${c.participant.lastname || ''} ${c.participant.name || ''} ${c.participant.patronymic || ''}`.trim() : '-'
+      fullname: c.participant ? `${c.participant.lastname || ''} ${c.participant.name || ''} ${c.participant.patronymic || ''}`.trim() : '-',
+      fulfillment_status: c.fulfillment_status?.name || null
     }))
     
     totalPages.value = data.total_pages
@@ -690,6 +663,10 @@ const handleCabinetNavigate = (cabinetId) => {
   selectedCabinetId.value = cabinetId
 }
 
+const reopenCabinetDetailsModal = () => {
+  cabinetDetailsModalOpen.value = true
+}
+
 const openPersonalCabinetsModal = (sponsorId) => {
   selectedSponsorId.value = sponsorId
   personalCabinetsModalOpen.value = true
@@ -716,29 +693,6 @@ const handleEditSuccess = () => {
   fetchParticipants(currentPage.value)
 }
 
-const handleOpenUpgrade = (data) => {
-  selectedCabinetIdForUpgrade.value = data.cabinetId
-  currentPaketIdForUpgrade.value = data.currentPaketId
-  editModalOpen.value = false
-  upgradeModalOpen.value = true
-}
-
-const closeUpgradeModal = () => {
-  upgradeModalOpen.value = false
-  selectedCabinetIdForUpgrade.value = null
-  currentPaketIdForUpgrade.value = null
-}
-
-const handleBackToEdit = () => {
-  upgradeModalOpen.value = false
-  editModalOpen.value = true
-}
-
-const handleUpgradeSuccess = () => {
-  upgradeModalOpen.value = false
-  fetchParticipants(currentPage.value)
-}
-
 const openBonusesModal = (item) => {
   selectedCabinetIdForBonuses.value = item.id
   selectedParticipantIdForBonuses.value = item.participant_id
@@ -751,42 +705,12 @@ const closeBonusesModal = () => {
   selectedParticipantIdForBonuses.value = null
 }
 
-const openDeleteModal = (item) => {
-  itemToDelete.value = item
-  deleteModalOpen.value = true
+const openBlankForm = (item) => {
+  if (!item.id) return
+  const url = `/print/blank/${item.id}`
+  window.open(url, '_blank', 'width=800,height=1000')
 }
 
-const confirmDelete = async () => {
-  if (!itemToDelete.value) return
-  
-  const cabinetId = itemToDelete.value.id
-  deleteModalOpen.value = false
-
-  try {
-    const token = localStorage.getItem('access_token')
-    
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/cabinets/with-participant/${cabinetId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || 'Failed to delete participant')
-    }
-
-    // Refresh data
-    fetchParticipants(currentPage.value)
-  } catch (e) {
-    console.error('Error deleting participant:', e)
-    alert(`Ошибка при удалении участника: ${e.message}`)
-  } finally {
-    itemToDelete.value = null
-  }
-}
 
 
 onMounted(async () => {
@@ -798,3 +722,34 @@ onMounted(async () => {
   fetchParticipants(currentPage.value)
 })
 </script>
+
+<style scoped>
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-issued {
+  background-color: #28a745; /* Зеленый - Выдано */
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-partial {
+  background-color: #ffc107; /* Желтый - Частично выдано */
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.status-not-issued {
+  background-color: #dc3545; /* Красный - Не выдано */
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-unknown {
+  background-color: #6c757d; /* Серый - Неизвестно */
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
+</style>

@@ -146,6 +146,15 @@
               {{ item.personal_number }}
             </span>
           </template>
+          <template #cell-fulfillment_status="{ item }">
+            <span 
+              v-if="item.fulfillment_status"
+              class="status-indicator" 
+              :class="getFulfillmentStatusClass(item.fulfillment_status)"
+              :title="item.fulfillment_status"
+            ></span>
+            <span v-else>-</span>
+          </template>
           <template #cell-register_at="{ value }">
             {{ formatDate(value) }}
           </template>
@@ -192,6 +201,7 @@
       :initial-tab="initialTab"
       @close="closeCabinetDetailsModal"
       @navigate="handleCabinetNavigate"
+      @reopen="reopenCabinetDetailsModal"
     />
 
     <!-- Модальное окно личников -->
@@ -209,19 +219,9 @@
       :pakets="pakets"
       @close="closeEditModal"
       @success="handleEditSuccess"
-      @upgrade="handleOpenUpgrade"
     />
 
-    <!-- Модальное окно Upgrade -->
-    <UpgradeModal
-      :is-open="upgradeModalOpen"
-      :cabinet-id="selectedCabinetIdForUpgrade"
-      :current-paket-id="currentPaketIdForUpgrade"
-      :pakets="pakets"
-      @close="closeUpgradeModal"
-      @back="handleBackToEdit"
-      @success="handleUpgradeSuccess"
-    />
+
 
     <!-- Модальное окно бонусов -->
     <BonusesModal
@@ -240,7 +240,7 @@ import AddParticipantModal from '../components/AddParticipantModal.vue'
 import CabinetDetailsModal from '../components/CabinetDetailsModal.vue'
 import PersonalCabinetsModal from '../components/PersonalCabinetsModal.vue'
 import EditParticipantModal from '../components/EditParticipantModal.vue'
-import UpgradeModal from '../components/UpgradeModal.vue'
+
 import BonusesModal from '../components/BonusesModal.vue'
 import { BACKEND_API_URL } from '../config'
 
@@ -287,17 +287,13 @@ const bonusesModalOpen = ref(false)
 const selectedCabinetIdForBonuses = ref(null)
 const selectedParticipantIdForBonuses = ref(null)
 
-// Upgrade modal
-const upgradeModalOpen = ref(false)
-const selectedCabinetIdForUpgrade = ref(null)
-const currentPaketIdForUpgrade = ref(null)
-
 const columns = [
   { key: 'branch_name', label: 'Филиал' },
   { key: 'personal_number', label: 'Номер' },
   { key: 'fullname', label: 'ФИО' },
   { key: 'paket_name', label: 'Пакет' },
   { key: 'status_name', label: 'Статус' },
+  { key: 'fulfillment_status', label: 'Статус выдачи' },
   { key: 'register_at', label: 'Дата регистрации' }
 ]
 
@@ -353,6 +349,23 @@ const formatDate = (dateString) => {
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${year}.${month}.${day} ${hours}:${minutes}`
 }
+
+const getFulfillmentStatusClass = (statusName) => {
+  if (!statusName) return 'status-unknown'
+  
+  const status = statusName.toLowerCase()
+  
+  if (status === 'выдано' || status === 'issued') {
+    return 'status-issued' // Зеленый круг
+  } else if (status === 'частично выдано' || status === 'partially issued' || status.includes('частично')) {
+    return 'status-partial' // Желтый круг
+  } else if (status === 'не выдано' || status === 'not issued') {
+    return 'status-not-issued' // Красный круг
+  }
+  
+  return 'status-unknown' // Серый круг по умолчанию
+}
+
 
 const fetchBranches = async () => {
   try {
@@ -461,7 +474,8 @@ const fetchParticipants = async (page = 1) => {
       branch_id: c.branch_id || null,
       paket_name: c.paket?.name || '-',
       status_name: c.status?.name || '-',
-      fullname: c.participant ? `${c.participant.lastname || ''} ${c.participant.name || ''} ${c.participant.patronymic || ''}`.trim() : '-'
+      fullname: c.participant ? `${c.participant.lastname || ''} ${c.participant.name || ''} ${c.participant.patronymic || ''}`.trim() : '-',
+      fulfillment_status: c.fulfillment_status?.name || null
     }))
     
     totalPages.value = data.total_pages
@@ -628,6 +642,10 @@ const handleCabinetNavigate = (cabinetId) => {
   selectedCabinetId.value = cabinetId
 }
 
+const reopenCabinetDetailsModal = () => {
+  cabinetDetailsModalOpen.value = true
+}
+
 const openPersonalCabinetsModal = (sponsorId) => {
   selectedSponsorId.value = sponsorId
   personalCabinetsModalOpen.value = true
@@ -651,29 +669,6 @@ const closeEditModal = () => {
 }
 
 const handleEditSuccess = () => {
-  fetchParticipants(currentPage.value)
-}
-
-const handleOpenUpgrade = (data) => {
-  selectedCabinetIdForUpgrade.value = data.cabinetId
-  currentPaketIdForUpgrade.value = data.currentPaketId
-  editModalOpen.value = false
-  upgradeModalOpen.value = true
-}
-
-const closeUpgradeModal = () => {
-  upgradeModalOpen.value = false
-  selectedCabinetIdForUpgrade.value = null
-  currentPaketIdForUpgrade.value = null
-}
-
-const handleBackToEdit = () => {
-  upgradeModalOpen.value = false
-  editModalOpen.value = true
-}
-
-const handleUpgradeSuccess = () => {
-  upgradeModalOpen.value = false
   fetchParticipants(currentPage.value)
 }
 
@@ -714,3 +709,34 @@ onMounted(async () => {
   fetchParticipants(currentPage.value)
 })
 </script>
+
+<style scoped>
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-issued {
+  background-color: #28a745; /* Зеленый - Выдано */
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-partial {
+  background-color: #ffc107; /* Желтый - Частично выдано */
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.status-not-issued {
+  background-color: #dc3545; /* Красный - Не выдано */
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-unknown {
+  background-color: #6c757d; /* Серый - Неизвестно */
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+}
+</style>
