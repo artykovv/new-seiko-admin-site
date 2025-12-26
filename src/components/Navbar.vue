@@ -101,5 +101,39 @@ const isActive = (path) => {
   background-color: #ffffff !important;
   color: rgb(0, 0, 128) !important;
 }
+
+@media (max-width: 768px) {
+  .navbar-navbar {
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .navbar-segmented-control {
+    padding: 3px;
+    border-radius: 6px;
+    min-width: min-content;
+  }
+
+  .navbar-segment {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-navbar {
+    margin-bottom: 0.75rem;
+  }
+
+  .navbar-segmented-control {
+    padding: 2px;
+  }
+
+  .navbar-segment {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
 </style>
 

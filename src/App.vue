@@ -69,5 +69,31 @@ const isPublicPage = computed(() => {
   .main-content {
     margin-left: 0 !important;
   }
+
+  .container-fluid {
+    padding: 1rem !important;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .btn-outline-secondary {
+    padding: 0.375rem 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .container-fluid {
+    padding: 0.75rem !important;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+  }
+
+  .d-flex.align-items-center.mb-3 {
+    margin-bottom: 0.75rem !important;
+  }
 }
 </style>

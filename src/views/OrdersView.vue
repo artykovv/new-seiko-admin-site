@@ -965,11 +965,13 @@ watch(() => addModalOpen.value, (newValue) => {
 const changePage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page
+    fetchOrders()
   }
 }
 
 const changePageSize = () => {
   currentPage.value = 1
+  fetchOrders()
 }
 
 const displayedPages = computed(() => {
@@ -1186,10 +1188,8 @@ const fetchOrders = async () => {
     
     const data = await response.json()
     
-    // API возвращает массив заказов напрямую
-    const ordersArray = Array.isArray(data) ? data : (data.orders || data.items || [])
-    
     // Форматируем данные для таблицы
+    const ordersArray = data.orders || []
     items.value = ordersArray.map(order => ({
       id: order.id,
       cabinet_info: formatCabinetInfo(order.cabinet),
@@ -1208,13 +1208,9 @@ const fetchOrders = async () => {
       _raw: order // Сохраняем исходные данные для действий
     }))
     
-    // Если API возвращает пагинацию
-    if (data.total_pages !== undefined) {
-      totalPages.value = data.total_pages
-    } else {
-      // Если пагинации нет, показываем все на одной странице
-      totalPages.value = 1
-    }
+    // Обновляем пагинацию из ответа API
+    totalPages.value = data.total_pages || 1
+    currentPage.value = data.page || 1
   } catch (err) {
     error.value = err.message || 'Ошибка при загрузке заказов'
     console.error('Error fetching orders:', err)

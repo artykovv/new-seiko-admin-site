@@ -1,8 +1,39 @@
 <template>
   <div class="home-container">
-    <div class="bento-grid">
+    <!-- Row 1: 1 column (Turnover) -->
+    <div class="dashboard-row row-1">
+      <!-- Card: Turnover -->
+      <div class="dashboard-card">
+        <div class="card-header-row">
+          <div class="card-title">Товарооборот</div>
+          <div class="period-selector">
+            <button 
+              class="period-btn" 
+              :class="{ active: periods.turnover === 'all' }"
+              @click="setPeriod('turnover', 'all')"
+            >За все время</button>
+            <button 
+              class="period-btn" 
+              :class="{ active: periods.turnover === 'month' }"
+              @click="setPeriod('turnover', 'month')"
+            >За текущий месяц</button>
+          </div>
+        </div>
+        <div class="card-content">
+          <div v-if="loadingTurnover" class="loading-state">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+          </div>
+          <div v-else-if="turnoverData" class="simple-stats centered">
+            <div class="big-value">{{ formatNumber(turnoverData.total_turnover) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: 2 columns -->
+    <div class="dashboard-row row-2">
       <!-- Card 1: Cashbox -->
-      <div class="bento-card medium">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Касса</div>
           <div class="period-selector">
@@ -40,7 +71,7 @@
       </div>
       
       <!-- Card 2: Bonuses -->
-      <div class="bento-card large">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Бонусы</div>
           <div class="period-selector">
@@ -88,9 +119,12 @@
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- Row 3: 2 columns (Orders + Participants) -->
+    <div class="dashboard-row row-2">
       <!-- Card 3: Orders -->
-      <div class="bento-card large">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Заказы</div>
           <div class="period-selector">
@@ -110,31 +144,33 @@
           <div v-if="loadingOrders" class="loading-state">
             <div class="spinner-border spinner-border-sm" role="status"></div>
           </div>
-          <div v-else-if="ordersData" class="simple-stats scrollable">
-            <div class="stat-row">
-              <span class="label">Всего заказов</span>
-              <span class="value">{{ ordersData.total_orders }}</span>
-            </div>
-            <div v-if="ordersData.fulfillment_statuses" class="stat-section">
-              <div class="section-label">Статус выдачи:</div>
-              <div v-for="status in ordersData.fulfillment_statuses" :key="status.id" class="stat-row small">
-                <span class="label">{{ status.name }}</span>
-                <span class="value">{{ status.orders_count }}</span>
-              </div>
-            </div>
-            <div v-if="ordersData.payment_statuses" class="stat-section">
-              <div class="section-label">Статус оплаты:</div>
-              <div v-for="status in ordersData.payment_statuses" :key="status.id" class="stat-row small">
-                <span class="label">{{ status.name }}</span>
-                <span class="value">{{ status.orders_count }}</span>
-              </div>
-            </div>
+          <div v-else-if="ordersData" class="table-container">
+            <table class="stats-table">
+              <tbody>
+                <tr>
+                  <td class="label">Всего заказов</td>
+                  <td class="value">{{ ordersData.total_orders }}</td>
+                </tr>
+                <template v-if="ordersData.fulfillment_statuses">
+                  <tr v-for="status in ordersData.fulfillment_statuses" :key="'f-' + status.id">
+                    <td class="label">{{ status.name }}</td>
+                    <td class="value">{{ status.orders_count }}</td>
+                  </tr>
+                </template>
+                <template v-if="ordersData.payment_statuses">
+                  <tr v-for="status in ordersData.payment_statuses" :key="'p-' + status.id">
+                    <td class="label">{{ status.name }}</td>
+                    <td class="value">{{ status.orders_count }}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
       <!-- Card 4: Participants -->
-      <div class="bento-card small">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Участники</div>
           <div class="period-selector">
@@ -170,36 +206,12 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Card 5: Turnover -->
-      <div class="bento-card small">
-        <div class="card-header-row">
-          <div class="card-title">Оборот</div>
-          <div class="period-selector">
-            <button 
-              class="period-btn" 
-              :class="{ active: periods.turnover === 'all' }"
-              @click="setPeriod('turnover', 'all')"
-            >Все</button>
-            <button 
-              class="period-btn" 
-              :class="{ active: periods.turnover === 'month' }"
-              @click="setPeriod('turnover', 'month')"
-            >Месяц</button>
-          </div>
-        </div>
-        <div class="card-content">
-          <div v-if="loadingTurnover" class="loading-state">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-          </div>
-          <div v-else-if="turnoverData" class="simple-stats centered">
-            <div class="big-value">{{ formatNumber(turnoverData.total_turnover) }}</div>
-          </div>
-        </div>
-      </div>
-
+    <!-- Row 4: 3 columns -->
+    <div class="dashboard-row row-3">
       <!-- Card 6: Statuses -->
-      <div class="bento-card medium">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Статусы</div>
           <div class="period-selector">
@@ -229,7 +241,7 @@
       </div>
 
       <!-- Card 7: Packages -->
-      <div class="bento-card small">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Пакеты</div>
           <div class="period-selector">
@@ -259,7 +271,7 @@
       </div>
 
       <!-- Card 8: Branches -->
-      <div class="bento-card small">
+      <div class="dashboard-card">
         <div class="card-header-row">
           <div class="card-title">Филиалы</div>
           <div class="period-selector">
@@ -287,21 +299,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Card 9: Products -->
-      <div class="bento-card small">
-        <div class="card-header-row">
-          <div class="card-title">Товары</div>
-        </div>
-        <div class="card-content">
-          <div v-if="loadingProducts" class="loading-state">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-          </div>
-          <div v-else-if="productsData" class="simple-stats centered">
-            <div class="big-value">{{ productsData.total_products }}</div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -314,21 +311,19 @@ const loadingCashbox = ref(false)
 const loadingBonuses = ref(false)
 const loadingOrders = ref(false)
 const loadingParticipants = ref(false)
-const loadingTurnover = ref(false)
 const loadingStatuses = ref(false)
 const loadingPakets = ref(false)
 const loadingBranches = ref(false)
-const loadingProducts = ref(false)
+const loadingTurnover = ref(false)
 
 const cashboxData = ref(null)
 const bonusesData = ref(null)
 const ordersData = ref(null)
 const participantsData = ref(null)
-const turnoverData = ref(null)
 const statusesData = ref(null)
 const paketsData = ref(null)
 const branchesData = ref(null)
-const productsData = ref(null)
+const turnoverData = ref(null)
 
 // Periods for each card (default: month)
 const periods = reactive({
@@ -336,10 +331,10 @@ const periods = reactive({
   bonuses: 'month',
   orders: 'month',
   participants: 'month',
-  turnover: 'month',
   statuses: 'month',
   pakets: 'month',
-  branches: 'month'
+  branches: 'month',
+  turnover: 'month'
 })
 
 const formatNumber = (num) => {
@@ -355,10 +350,10 @@ const setPeriod = (card, period) => {
     case 'bonuses': loadBonusesData(); break
     case 'orders': loadOrdersData(); break
     case 'participants': loadParticipantsData(); break
-    case 'turnover': loadTurnoverData(); break
     case 'statuses': loadStatusesData(); break
     case 'pakets': loadPaketsData(); break
     case 'branches': loadBranchesData(); break
+    case 'turnover': loadTurnoverData(); break
   }
 }
 
@@ -475,13 +470,34 @@ const loadParticipantsData = async () => {
   }
 }
 
+const buildTurnoverUrl = (period) => {
+  const url = new URL(`${BACKEND_API_URL}/api/admin/report/turnover/`)
+  if (period === 'month') {
+    // Get current month's first and last day
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1 // 0-indexed, so add 1
+    
+    // First day of month
+    const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`
+    
+    // Last day of month
+    const lastDay = new Date(year, month, 0).getDate()
+    const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    
+    url.searchParams.append('date_from', dateFrom)
+    url.searchParams.append('date_to', dateTo)
+  }
+  return url.toString()
+}
+
 const loadTurnoverData = async () => {
   loadingTurnover.value = true
   try {
     const token = localStorage.getItem('access_token')
     if (!token) return
 
-    const response = await fetch(buildUrl('/api/admin/report/turnover/', periods.turnover), {
+    const response = await fetch(buildTurnoverUrl(periods.turnover), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'accept': 'application/json'
@@ -489,7 +505,11 @@ const loadTurnoverData = async () => {
     })
 
     if (response.ok) {
-      turnoverData.value = await response.json()
+      const data = await response.json()
+      // Extract total_volume from summary
+      turnoverData.value = {
+        total_turnover: data.summary?.total_volume || 0
+      }
     }
   } catch (err) {
     console.error('Error loading turnover data:', err)
@@ -567,29 +587,7 @@ const loadBranchesData = async () => {
   }
 }
 
-const loadProductsData = async () => {
-  loadingProducts.value = true
-  try {
-    const token = localStorage.getItem('access_token')
-    if (!token) return
 
-    // Products always shows all (no period parameter)
-    const response = await fetch(`${BACKEND_API_URL}/api/admin/report/products/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      }
-    })
-
-    if (response.ok) {
-      productsData.value = await response.json()
-    }
-  } catch (err) {
-    console.error('Error loading products data:', err)
-  } finally {
-    loadingProducts.value = false
-  }
-}
 
 onMounted(() => {
   loadCashboxData()
@@ -600,7 +598,6 @@ onMounted(() => {
   loadStatusesData()
   loadPaketsData()
   loadBranchesData()
-  loadProductsData()
 })
 </script>
 
@@ -611,16 +608,45 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-.bento-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 250px);
+/* Dashboard Rows */
+.dashboard-row {
+  display: flex;
   gap: 20px;
+  margin-bottom: 20px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.bento-card {
+/* Row with 1 column */
+.dashboard-row.row-1 {
+  flex-direction: row;
+}
+
+.dashboard-row.row-1 .dashboard-card {
+  flex: 1;
+}
+
+/* Row with 2 columns */
+.dashboard-row.row-2 {
+  flex-direction: row;
+}
+
+.dashboard-row.row-2 .dashboard-card {
+  flex: 1;
+}
+
+/* Row with 3 columns */
+.dashboard-row.row-3 {
+  flex-direction: row;
+}
+
+.dashboard-row.row-3 .dashboard-card {
+  flex: 1;
+}
+
+/* Dashboard Card */
+.dashboard-card {
   border: 1px solid #dee2e6;
   border-radius: 12px;
   background: white;
@@ -629,6 +655,7 @@ onMounted(() => {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 250px;
 }
 
 .card-header-row {
@@ -770,7 +797,6 @@ onMounted(() => {
 }
 
 .stat-section:not(:first-child) {
-  border-top: 2px solid #e9ecef;
   margin-top: 8px;
   padding-top: 8px;
 }
@@ -792,6 +818,50 @@ onMounted(() => {
 }
 
 .value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #344767;
+  text-align: right;
+}
+
+/* Table Container */
+.table-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Stats Table */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stats-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.stats-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.stats-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.stats-table td {
+  padding: 10px 20px;
+}
+
+.stats-table td.label {
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 400;
+  text-align: left;
+}
+
+.stats-table td.value {
   font-size: 14px;
   font-weight: 500;
   color: #344767;
@@ -822,58 +892,43 @@ onMounted(() => {
   font-weight: 400;
 }
 
-/* Large card - spans 2x2 */
-.large {
-  grid-column: span 2;
-  grid-row: span 2;
-}
-
-/* Medium card - spans 2x1 */
-.medium {
-  grid-column: span 2;
-  grid-row: span 1;
-}
-
-/* Small card - spans 1x1 */
-.small {
-  grid-column: span 1;
-  grid-row: span 1;
-}
-
 /* Responsive design */
 @media (max-width: 1024px) {
-  .bento-grid {
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: auto;
+  .dashboard-row.row-3 {
+    flex-wrap: wrap;
   }
   
-  .large,
-  .medium {
-    grid-column: span 2;
-  }
-  
-  .small {
-    grid-column: span 1;
+  .dashboard-row.row-3 .dashboard-card {
+    flex: 1 1 calc(50% - 10px);
+    min-width: 250px;
   }
 }
 
-@media (max-width: 640px) {
-  .bento-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-    grid-template-rows: auto;
+@media (max-width: 768px) {
+  .home-container {
+    padding: 15px;
+  }
+
+  .dashboard-row {
+    flex-direction: column;
+    margin-bottom: 15px;
   }
   
-  .bento-card {
-    grid-column: span 1 !important;
-    grid-row: span 1 !important;
-    min-height: 200px;
+  .dashboard-row .dashboard-card {
+    flex: 1 1 100%;
+    min-width: 100%;
+    min-height: auto;
   }
   
   .card-header-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+    padding: 12px 15px;
+  }
+  
+  .card-title {
+    font-size: 12px;
   }
   
   .period-selector {
@@ -882,6 +937,33 @@ onMounted(() => {
   
   .period-btn {
     flex: 1;
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .card-content {
+    padding: 0;
+  }
+  
+  .stat-row {
+    padding: 8px 15px;
+  }
+
+  .stat-row.small {
+    padding: 6px 15px 6px 24px;
+  }
+
+  /* Table responsive */
+  .stats-table td {
+    padding: 8px 15px;
+  }
+
+  .stats-table td.label {
+    font-size: 12px;
+  }
+
+  .stats-table td.value {
+    font-size: 13px;
   }
   
   .big-value {
@@ -898,6 +980,69 @@ onMounted(() => {
   
   .label {
     font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-container {
+    padding: 10px;
+  }
+
+  .dashboard-row {
+    margin-bottom: 10px;
+  }
+
+  .dashboard-card {
+    border-radius: 8px;
+  }
+
+  .card-header-row {
+    padding: 10px 12px;
+  }
+
+  .card-title {
+    font-size: 11px;
+  }
+
+  .period-btn {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+
+  .stat-row {
+    padding: 6px 12px;
+  }
+
+  .stat-row.small {
+    padding: 5px 12px 5px 20px;
+  }
+
+  .stats-table td {
+    padding: 6px 12px;
+  }
+
+  .stats-table td.label {
+    font-size: 11px;
+  }
+
+  .stats-table td.value {
+    font-size: 12px;
+  }
+
+  .big-value {
+    font-size: 28px;
+  }
+
+  .medium-value {
+    font-size: 20px;
+  }
+
+  .value {
+    font-size: 12px;
+  }
+
+  .label {
+    font-size: 11px;
   }
 }
 </style>

@@ -4,7 +4,7 @@
     <div 
       v-if="isOpen && isMobile" 
       class="position-fixed top-0 start-0 end-0 bottom-0 bg-dark bg-opacity-50 d-md-none"
-      style="z-index: 1040;"
+      style="z-index: 1020;"
       @click="toggle"
     ></div>
     
@@ -19,7 +19,7 @@
           ? (isOpen ? '280px' : '0') 
           : (isOpen ? '280px' : '60px'),
         height: isMobile ? '100vh' : 'calc(100vh - 2rem)',
-        zIndex: 1030,
+        zIndex: 1050,
         transition: 'width 0.3s ease, transform 0.3s ease',
         transform: isMobile && !isOpen ? 'translateX(-100%)' : 'translateX(0)',
         overflow: isMobile && !isOpen ? 'hidden' : 'visible'
@@ -48,6 +48,7 @@
               :to="item.path"
               class="sidebar-menu-item d-flex align-items-center text-decoration-none px-2 py-2 rounded"
               :class="{ 'sidebar-menu-item-active': isActive(item.path) }"
+              @click="handleMenuItemClick"
             >
               <i :class="`bi ${item.icon}`" style="font-size: 1.1rem; min-width: 24px; text-align: center;"></i>
               <span class="sidebar-menu-text ms-2" :class="{ 'sidebar-menu-text-visible': isOpen || isMobile }">{{ item.title }}</span>
@@ -78,7 +79,7 @@
         top: 'calc(1rem + 1rem + 40px - 16px)',
         width: '32px',
         height: '32px',
-        zIndex: 1035,
+        zIndex: 1060,
         backgroundColor: '#000080',
         transition: 'left 0.3s ease'
       }"
@@ -151,6 +152,13 @@ const isActive = (path) => {
   }
   // Для вложенных путей (например /products/...) проверяем начало пути
   return route.path.startsWith(path)
+}
+
+// Закрытие sidebar при клике на пункт меню в мобильной версии
+const handleMenuItemClick = () => {
+  if (isMobile.value && isOpen.value) {
+    toggle()
+  }
 }
 
 const handleResize = () => {
