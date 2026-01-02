@@ -57,7 +57,9 @@
               </td>
             </tr>
             <tr v-if="orderItems.length === 0">
-              <td colspan="5" class="text-center text-muted">Товары не выбраны</td>
+              <td colspan="5" class="text-center text-muted">
+                {{ orderData ? 'Товары не найдены в заказе' : 'Заказы не найдены для данного кабинета' }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -304,7 +306,6 @@ const fetchCabinetData = async () => {
 
     cabinetData.value = await response.json()
   } catch (err) {
-    console.error('Error fetching cabinet data:', err)
     throw err
   }
 }
@@ -315,43 +316,62 @@ const fetchOrderData = async () => {
     if (!token) {
       throw new Error('Токен авторизации не найден')
     }
-
-    // Получаем заказы кабинета
-    const ordersResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/?cabinet_id=${cabinetId}`, {
+    
+    // Получаем первый заказ кабинета со всеми данными
+    const orderUrl = `${BACKEND_API_URL}/api/admin/orders/first/${cabinetId}`
+    
+    const orderResponse = await fetch(orderUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'accept': 'application/json'
       }
     })
 
-    if (!ordersResponse.ok) {
-      throw new Error('Ошибка при загрузке заказов')
+    if (!orderResponse.ok) {
+      if (orderResponse.status === 404) {
+        return // Нет заказов - это нормально, просто выходим
+      }
+      throw new Error(`Ошибка при загрузке заказа: ${orderResponse.status}`)
     }
 
-    const orders = await ordersResponse.json()
+    const order = await orderResponse.json()
     
-    // Берем первый заказ (самый ранний по id)
-    if (orders && orders.length > 0) {
-      // Сортируем по id по возрастанию и берем первый
-      const sortedOrders = orders.sort((a, b) => a.id - b.id)
-      orderData.value = sortedOrders[0]
+    // Сохраняем данные заказа
+    orderData.value = {
+      id: order.id,
+      total_amount: order.total_amount,
+      order_date: order.order_date,
+      payment_method: order.payment_method,
+      payment_status: order.payment_status,
+      status: order.status
+    }
 
-      // Получаем товары заказа
-      const itemsResponse = await fetch(`${BACKEND_API_URL}/api/admin/orders/${orderData.value.id}/items`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
+    // Преобразуем products в формат orderItems
+    // API теперь возвращает массив с вложенными объектами product и данными order_items
+    if (order.products && order.products.length > 0) {
+      orderItems.value = order.products.map(item => {
+        const product = item.product
+        const quantity = item.quantity || 1
+        const unitPrice = product.cost_price
+        
+        return {
+          id: product.id,
+          product: {
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            description: product.description
+          },
+          quantity: quantity,
+          unit_price: unitPrice,
+          total_price: (parseFloat(unitPrice) * quantity).toFixed(2),
+          issued_quantity: item.issued_quantity || 0
         }
       })
-
-      if (!itemsResponse.ok) {
-        throw new Error('Ошибка при загрузке товаров заказа')
-      }
-
-      orderItems.value = await itemsResponse.json()
+    } else {
+      orderItems.value = []
     }
   } catch (err) {
-    console.error('Error fetching order data:', err)
     // Не бросаем ошибку, просто оставляем пустой массив товаров
   }
 }
