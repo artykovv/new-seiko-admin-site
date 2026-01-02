@@ -53,6 +53,17 @@
             </li>
           </ul>
         </div>
+
+        <!-- Download Button -->
+        <button 
+          class="btn btn-outline-primary d-flex align-items-center gap-2" 
+          @click="downloadExport"
+          :disabled="downloading"
+          style="font-size: 14px;"
+        >
+          <i class="bi" :class="downloading ? 'bi-hourglass-split' : 'bi-download'"></i>
+          {{ downloading ? 'Загрузка...' : 'Скачать' }}
+        </button>
         
         <span class="text-muted small">Показать:</span>
         <select 
@@ -204,6 +215,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
+const downloading = ref(false)
 
 // Modal states
 const confirmModalOpen = ref(false)
@@ -355,6 +367,67 @@ const confirmIssue = async () => {
     alert(`Ошибка при выдаче бонуса: ${e.message}`)
   } finally {
     pendingItem.value = null
+  }
+}
+
+const downloadExport = async () => {
+  downloading.value = true
+  try {
+    const token = localStorage.getItem('access_token')
+    let url = `${BACKEND_API_URL}/api/admin/bonuses/summary/binary-cheque/export?`
+    
+    if (filters.value.year) {
+      let dateFrom, dateTo
+      
+      if (filters.value.month) {
+        // Specific month
+        dateFrom = new Date(filters.value.year, filters.value.month - 1, 1)
+        dateTo = new Date(filters.value.year, filters.value.month, 1)
+      } else {
+        // Whole year
+        dateFrom = new Date(filters.value.year, 0, 1)
+        dateTo = new Date(filters.value.year + 1, 0, 1)
+      }
+      
+      url += `date_from=${formatDateISO(dateFrom)}&date_to=${formatDateISO(dateTo)}`
+    } else {
+      // Default to current month if no filters
+      const now = new Date()
+      const dateFrom = new Date(now.getFullYear(), now.getMonth(), 1)
+      const dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      url += `date_from=${formatDateISO(dateFrom)}&date_to=${formatDateISO(dateTo)}`
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to download export')
+    }
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    
+    // Generate filename with date range
+    const year = filters.value.year || new Date().getFullYear()
+    const month = filters.value.month || new Date().getMonth() + 1
+    link.download = `binary-cheque-export-${year}-${String(month).padStart(2, '0')}.xlsx`
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (e) {
+    console.error('Error downloading export:', e)
+    alert('Ошибка при скачивании файла')
+  } finally {
+    downloading.value = false
   }
 }
 
