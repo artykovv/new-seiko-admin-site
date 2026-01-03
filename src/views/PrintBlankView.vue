@@ -38,6 +38,7 @@
           <thead>
             <tr>
               <th>Продукт</th>
+              <th>Наименования</th>
               <th>Количество</th>
               <th>Цена за шт.</th>
               <th>Итого</th>
@@ -47,6 +48,7 @@
           <tbody>
             <tr v-for="item in orderItems" :key="item.id">
               <td>{{ item.product?.name || '-' }}</td>
+              <td class="text-center">{{ item.product?.sku || '-' }}</td>
               <td class="text-center">{{ item.quantity }}</td>
               <td class="text-center">${{ formatPrice(item.unit_price) }}</td>
               <td class="text-center">${{ formatPrice(item.total_price) }}</td>
@@ -57,7 +59,7 @@
               </td>
             </tr>
             <tr v-if="orderItems.length === 0">
-              <td colspan="5" class="text-center text-muted">
+              <td colspan="6" class="text-center text-muted">
                 {{ orderData ? 'Товары не найдены в заказе' : 'Заказы не найдены для данного кабинета' }}
               </td>
             </tr>
@@ -132,14 +134,14 @@
         
         <div class="payment-options">
           <div class="payment-option">
-            <div class="checkbox-large" :class="{ 'checked': paymentMethod === 'Наличные' }">
-              <span v-if="paymentMethod === 'Наличные'">✓</span>
+            <div class="checkbox-large" :class="{ 'checked': isPaymentMethod('Наличные') }">
+              <span v-if="isPaymentMethod('Наличные')">✓</span>
             </div>
             <label>Наличными / Наличная төлөө</label>
           </div>
           <div class="payment-option">
-            <div class="checkbox-large" :class="{ 'checked': paymentMethod === 'MBank' }">
-              <span v-if="paymentMethod === 'MBank'">✓</span>
+            <div class="checkbox-large" :class="{ 'checked': isPaymentMethod('MBank') }">
+              <span v-if="isPaymentMethod('MBank')">✓</span>
             </div>
             <label>MBank</label>
           </div>
@@ -252,6 +254,23 @@ const paymentMethod = computed(() => {
   return orderData.value?.payment_method?.name || ''
 })
 
+const isPaymentMethod = (method) => {
+  const currentMethod = paymentMethod.value.toLowerCase().trim()
+  const checkMethod = method.toLowerCase().trim()
+  
+  // Проверка для MBank (может быть "MBank", "Мбанк", "mbank" и т.д.)
+  if (checkMethod === 'mbank') {
+    return currentMethod === 'mbank' || currentMethod === 'мбанк'
+  }
+  
+  // Проверка для Наличные (может быть "Наличные", "наличные", "Cash" и т.д.)
+  if (checkMethod === 'наличные') {
+    return currentMethod === 'наличные' || currentMethod === 'cash'
+  }
+  
+  return currentMethod === checkMethod
+}
+
 const formatFullName = (participant) => {
   if (!participant) return '-'
   const parts = []
@@ -335,6 +354,9 @@ const fetchOrderData = async () => {
     }
 
     const order = await orderResponse.json()
+    
+    // Debug: выводим payment_method для проверки
+    console.log('Payment Method from API:', order.payment_method)
     
     // Сохраняем данные заказа
     orderData.value = {
