@@ -328,11 +328,6 @@ const actions = [
     handler: (item) => openCabinetDetailsModal(item.id, 'bonuses')
   },
   {
-    label: 'Бланк',
-    icon: 'bi-file-earmark-text',
-    handler: (item) => openBlankForm(item)
-  },
-  {
     label: 'Изменить',
     icon: 'bi-pencil',
     handler: (item) => openEditModal(item)
@@ -703,12 +698,6 @@ const closeBonusesModal = () => {
   bonusesModalOpen.value = false
   selectedCabinetIdForBonuses.value = null
   selectedParticipantIdForBonuses.value = null
-}
-
-const openBlankForm = (item) => {
-  if (!item.id) return
-  const url = `/print/blank/${item.id}`
-  window.open(url, '_blank', 'width=800,height=1000')
 }
 
 

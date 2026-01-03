@@ -243,6 +243,12 @@ const orderData = ref(null)
 const orderItems = ref([])
 
 const currentDate = computed(() => {
+  // Используем register_at из cabinetData, если доступен
+  if (cabinetData.value?.register_at) {
+    return formatDate(cabinetData.value.register_at)
+  }
+  
+  // Fallback на текущую дату
   const today = new Date()
   const day = String(today.getDate()).padStart(2, '0')
   const month = String(today.getMonth() + 1).padStart(2, '0')
@@ -338,6 +344,9 @@ const fetchCabinetData = async () => {
     }
 
     cabinetData.value = await response.json()
+    
+    // Debug: выводим register_at для проверки
+    console.log('Cabinet register_at:', cabinetData.value.register_at)
   } catch (err) {
     throw err
   }
