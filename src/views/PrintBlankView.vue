@@ -48,7 +48,7 @@
           <tbody>
             <tr v-for="item in orderItems" :key="item.id">
               <td>{{ item.product?.name || '-' }}</td>
-              <td class="text-center">{{ item.product?.sku || '-' }}</td>
+              <td class="text-center">{{ formatSKU(item.product?.sku) }}</td>
               <td class="text-center">{{ item.quantity }}</td>
               <td class="text-center">${{ formatPrice(item.unit_price) }}</td>
               <td class="text-center">${{ formatPrice(item.total_price) }}</td>
@@ -303,6 +303,20 @@ const formatPriceInt = (price) => {
   if (!price) return '0'
   const numPrice = typeof price === 'string' ? parseFloat(price) : price
   return Math.round(numPrice).toString()
+}
+
+const formatSKU = (sku) => {
+  if (!sku) return '-'
+  
+  const firstLetter = sku.charAt(0).toUpperCase()
+  
+  if (firstLetter === 'F') {
+    return `${sku} Товар`
+  } else if (firstLetter === 'K') {
+    return `${sku} Услуга`
+  }
+  
+  return sku
 }
 
 const fetchCabinetData = async () => {
