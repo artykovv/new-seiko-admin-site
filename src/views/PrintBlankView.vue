@@ -78,8 +78,8 @@
               </tr>
               <tr class="summary-row final-total-row">
                 <td colspan="5" class="summary-label">Итого к оплате</td>
-                <td class="text-center summary-value">{{ formatPrice(finalTotalToPay) }}</td>
-                <td class="text-center summary-value">{{ formatSom(finalTotalToPay) }}</td>
+                <td class="text-center summary-value">{{ formatPrice(orderData?.total_amount) }}</td>
+                <td class="text-center summary-value">{{ formatSom(orderData?.total_amount) }}</td>
                 <td class="empty-cell"></td>
               </tr>
             </template>
@@ -285,12 +285,6 @@ const paymentMethod = computed(() => {
 const referralBonus = computed(() => {
   const bonus = cabinetData.value?.paket?.referral_bonus || 0
   return typeof bonus === 'string' ? parseFloat(bonus) : bonus
-})
-
-const finalTotalToPay = computed(() => {
-  const total = orderData.value?.total_amount || 0
-  const bonus = referralBonus.value
-  return Math.max(0, (typeof total === 'string' ? parseFloat(total) : total) - bonus)
 })
 
 const isPaymentMethod = (method) => {
