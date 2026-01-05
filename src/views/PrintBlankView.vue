@@ -71,6 +71,12 @@
             <!-- Summary Rows -->
             <template v-if="orderItems.length > 0">
               <tr class="summary-row">
+                <td colspan="5" class="summary-label">Всего (сумма товаров)</td>
+                <td class="text-center summary-value">{{ formatPrice(productsTotal) }}</td>
+                <td class="text-center summary-value">{{ formatSom(productsTotal) }}</td>
+                <td class="empty-cell"></td>
+              </tr>
+              <tr class="summary-row">
                 <td colspan="5" class="summary-label">Вычет реферального бонуса (рекламный)</td>
                 <td class="text-center summary-value">-{{ formatPrice(referralBonus) }}</td>
                 <td class="text-center summary-value">-{{ formatSom(referralBonus) }}</td>
@@ -78,8 +84,8 @@
               </tr>
               <tr class="summary-row final-total-row">
                 <td colspan="5" class="summary-label">Итого к оплате</td>
-                <td class="text-center summary-value">{{ formatPrice(orderData?.total_amount) }}</td>
-                <td class="text-center summary-value">{{ formatSom(orderData?.total_amount) }}</td>
+                <td class="text-center summary-value">{{ formatPrice(finalTotalToPay) }}</td>
+                <td class="text-center summary-value">{{ formatSom(finalTotalToPay) }}</td>
                 <td class="empty-cell"></td>
               </tr>
             </template>
@@ -172,7 +178,7 @@
           <div class="payment-option full-width">
             <label>Полная оплата / Жалпы төлөм:</label>
             <div class="payment-input">
-              ${{ formatPrice(orderData?.total_amount) }} / {{ formatSom(orderData?.total_amount) }} сом
+              {{ formatPrice(finalTotalToPay) }} / {{ formatSom(finalTotalToPay) }} сом
             </div>
           </div>
         </div>
@@ -285,6 +291,17 @@ const paymentMethod = computed(() => {
 const referralBonus = computed(() => {
   const bonus = cabinetData.value?.paket?.referral_bonus || 0
   return typeof bonus === 'string' ? parseFloat(bonus) : bonus
+})
+
+const productsTotal = computed(() => {
+  return orderItems.value.reduce((sum, item) => {
+    const price = typeof item.total_price === 'string' ? parseFloat(item.total_price) : item.total_price
+    return sum + (price || 0)
+  }, 0)
+})
+
+const finalTotalToPay = computed(() => {
+  return Math.max(0, productsTotal.value - referralBonus.value)
 })
 
 const isPaymentMethod = (method) => {
