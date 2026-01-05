@@ -39,10 +39,12 @@
             <tr>
               <th>Продукт</th>
               <th>Наименования</th>
-              <th>Количество</th>
-              <th>Цена за шт.</th>
-              <th>Итого</th>
-              <th style="width: 60px;">Выдано</th>
+              <th>Кол-во</th>
+              <th>Цена ($)</th>
+              <th>Цена (сом)</th>
+              <th>Итого ($)</th>
+              <th>Итого (сом)</th>
+              <th style="width: 40px;">Выдано</th>
             </tr>
           </thead>
           <tbody>
@@ -50,8 +52,10 @@
               <td>{{ item.product?.name || '-' }}</td>
               <td class="text-center">{{ formatSKU(item.product?.sku) }}</td>
               <td class="text-center">{{ item.quantity }}</td>
-              <td class="text-center">${{ formatPrice(item.unit_price) }}</td>
-              <td class="text-center">${{ formatPrice(item.total_price) }}</td>
+              <td class="text-center">{{ formatPrice(item.unit_price) }}</td>
+              <td class="text-center">{{ formatSom(item.unit_price) }}</td>
+              <td class="text-center">{{ formatPrice(item.total_price) }}</td>
+              <td class="text-center">{{ formatSom(item.total_price) }}</td>
               <td class="text-center">
                 <div class="checkbox-large" :class="{ 'checked': item.issued_quantity >= item.quantity }">
                   <span v-if="item.issued_quantity >= item.quantity">✓</span>
@@ -59,10 +63,26 @@
               </td>
             </tr>
             <tr v-if="orderItems.length === 0">
-              <td colspan="6" class="text-center text-muted">
+              <td colspan="8" class="text-center text-muted">
                 {{ orderData ? 'Товары не найдены в заказе' : 'Заказы не найдены для данного кабинета' }}
               </td>
             </tr>
+            
+            <!-- Summary Rows -->
+            <template v-if="orderItems.length > 0">
+              <tr class="summary-row">
+                <td colspan="5" class="summary-label">Вычет реферального бонуса (рекламный)</td>
+                <td class="text-center summary-value">-{{ formatPrice(referralBonus) }}</td>
+                <td class="text-center summary-value">-{{ formatSom(referralBonus) }}</td>
+                <td class="empty-cell"></td>
+              </tr>
+              <tr class="summary-row final-total-row">
+                <td colspan="5" class="summary-label">Итого к оплате</td>
+                <td class="text-center summary-value">{{ formatPrice(finalTotalToPay) }}</td>
+                <td class="text-center summary-value">{{ formatSom(finalTotalToPay) }}</td>
+                <td class="empty-cell"></td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -151,7 +171,9 @@
           </div>
           <div class="payment-option full-width">
             <label>Полная оплата / Жалпы төлөм:</label>
-            <div class="payment-input">{{ formatPriceInt(orderData?.total_amount) }}</div>
+            <div class="payment-input">
+              ${{ formatPrice(orderData?.total_amount) }} / {{ formatSom(orderData?.total_amount) }} сом
+            </div>
           </div>
         </div>
       </div>
@@ -260,6 +282,17 @@ const paymentMethod = computed(() => {
   return orderData.value?.payment_method?.name || ''
 })
 
+const referralBonus = computed(() => {
+  const bonus = cabinetData.value?.paket?.referral_bonus || 0
+  return typeof bonus === 'string' ? parseFloat(bonus) : bonus
+})
+
+const finalTotalToPay = computed(() => {
+  const total = orderData.value?.total_amount || 0
+  const bonus = referralBonus.value
+  return Math.max(0, (typeof total === 'string' ? parseFloat(total) : total) - bonus)
+})
+
 const isPaymentMethod = (method) => {
   const currentMethod = paymentMethod.value.toLowerCase().trim()
   const checkMethod = method.toLowerCase().trim()
@@ -299,10 +332,18 @@ const formatDate = (dateString) => {
   }
 }
 
+const EXCHANGE_RATE = 88
+
+const formatSom = (usdPrice) => {
+  if (!usdPrice) return '0'
+  const numPrice = typeof usdPrice === 'string' ? parseFloat(usdPrice) : usdPrice
+  return Math.round(numPrice * EXCHANGE_RATE).toLocaleString('ru-RU')
+}
+
 const formatPrice = (price) => {
-  if (!price) return '0.00'
+  if (!price) return '0'
   const numPrice = typeof price === 'string' ? parseFloat(price) : price
-  return numPrice.toFixed(2)
+  return numPrice % 1 === 0 ? numPrice.toString() : numPrice.toFixed(2)
 }
 
 const formatPriceInt = (price) => {
@@ -397,7 +438,7 @@ const fetchOrderData = async () => {
       orderItems.value = order.products.map(item => {
         const product = item.product
         const quantity = item.quantity || 1
-        const unitPrice = product.cost_price
+        const unitPrice = item.unit_price || 0
         
         return {
           id: product.id,
@@ -626,6 +667,30 @@ onMounted(async () => {
 
 .product-table .text-muted {
   color: #999;
+}
+
+/* Summary Rows in Product Table */
+.summary-label {
+  font-weight: bold;
+  text-align: right;
+  padding-right: 10px !important;
+}
+
+.summary-value {
+  font-weight: bold;
+}
+
+.final-total-row {
+  background-color: #f5f5f5;
+}
+
+.final-total-row .summary-label {
+  text-transform: uppercase;
+  font-size: 8px; /* Match table font size */
+}
+
+.empty-cell {
+  background-color: #f9f9f9;
 }
 
 /* Section B */
