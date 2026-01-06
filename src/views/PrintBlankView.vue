@@ -343,7 +343,7 @@ const formatDate = (dateString) => {
   }
 }
 
-const EXCHANGE_RATE = 88
+const EXCHANGE_RATE = 85
 
 const formatSom = (usdPrice) => {
   if (!usdPrice) return '0'
